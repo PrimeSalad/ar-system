@@ -52,9 +52,9 @@ Gemini receives only the rough notes submitted to the AI drafting dialog plus th
 
 1. Set the reporting start and end dates.
 2. Add one accomplishment, use **Bulk same-day** for one line per task with separate categories and units, or paste rough notes into **Draft with AI**.
-3. Review dates, categories, descriptions, and units in the activity list.
+3. Review dates, categories, descriptions, and units in the activity list, or select a description in the document preview to edit its complete row there.
 4. Expand **Report details & signatories** if the office header or names need changes.
-5. Review the live report preview.
+5. Review the live report preview; preview edits require **Save changes** before printing or exporting.
 6. Select **Export Excel** for the formatted workbook, or **Print / PDF** for a browser printout.
 
 ## Production build

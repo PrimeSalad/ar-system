@@ -329,7 +329,13 @@ export default function App() {
             />
             <ActivityList activities={report.activities} onEdit={(activity) => { setEditing(activity); focusEntry(); }} onDelete={handleDeleteActivity} onAddFocus={focusEntry} />
           </div>
-          <DocumentPreview report={report} exporting={exporting} onExport={handleExport} onPrint={() => window.print()} />
+          <DocumentPreview
+            report={report}
+            exporting={exporting}
+            onExport={handleExport}
+            onPrint={() => window.print()}
+            onUpdateActivity={(activity) => saveActivities([activity])}
+          />
         </div>
       </main>
 
