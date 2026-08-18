@@ -239,7 +239,7 @@ export function DocumentPreview({
             <p className="report-header__office">{report.office}</p>
             <div className="report-header__gap report-header__gap--small" />
             <h3>{report.title}</h3>
-            <p>As of {formatPeriod(report.startDate, report.endDate)}</p>
+            <p className="report-header__period">As of {formatPeriod(report.startDate, report.endDate)}</p>
           </header>
 
           <table className="report-table">
@@ -267,7 +267,13 @@ export function DocumentPreview({
                         disabled={Boolean(editing)}
                         aria-label={`Edit accomplishment: ${activityDescription(activity)}`}
                       >
-                        <span>{activityDescription(activity)}</span>
+                        <span>
+                          {activity.category.toLowerCase() === "custom" ? (
+                            activity.details
+                          ) : (
+                            <><strong>{activity.category}: </strong>{activity.details}</>
+                          )}
+                        </span>
                         <PencilLine aria-hidden="true" size={13} />
                       </button>
                     </td>

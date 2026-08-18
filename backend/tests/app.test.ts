@@ -142,18 +142,43 @@ describe("report API", () => {
 });
 
 describe("Excel export", () => {
-  it("creates the supplied A-D template structure with grouped dates", async () => {
+  it("matches the supplied A-D workbook format with grouped dates and styled descriptions", async () => {
     const buffer = await buildAccomplishmentWorkbook(fixture());
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(Uint8Array.from(buffer).buffer);
-    const sheet = workbook.getWorksheet("ACCOMPLISHMENT")!;
+    const sheet = workbook.getWorksheet("AUGUST 16-31, 2026")!;
 
     expect(sheet.getCell("A1").value).toBe("Republic of the Philippines");
     expect(sheet.getCell("A7").value).toBe("ACCOMPLISHMENT REPORT");
+    expect(sheet.getCell("A8").font.underline).toBe(true);
     expect(sheet.getCell("B10").value).toBe("DESCRIPTION");
     expect(sheet.getCell("D11").value).toBe(12);
     expect(sheet.getCell("A11").isMerged).toBe(true);
+    expect(sheet.getCell("B11").value).toMatchObject({
+      richText: [
+        { text: "Receive Inquiries, concerns of LYDC and SK: ", font: { bold: true, name: "Times New Roman", size: 9 } },
+        { text: "Communicated with 12 SK chairpersons regarding the upcoming meeting", font: { name: "Times New Roman", size: 9 } },
+      ],
+    });
+    expect(sheet.getColumn("A").width).toBeCloseTo(17.33, 1);
+    expect(sheet.getColumn("C").width).toBeCloseTo(78.89, 1);
     expect(sheet.pageSetup.orientation).toBe("portrait");
+    expect(sheet.pageSetup.paperSize).toBe(14);
+    expect(sheet.pageSetup.scale).toBe(79);
+    expect(sheet.pageSetup.margins).toMatchObject({
+      left: 0.7,
+      right: 0.7,
+      top: 0.75,
+      bottom: 0,
+      header: 0.3,
+      footer: 0,
+    });
+    expect(sheet.pageSetup.printArea).toBe("A1:D22");
+    expect(sheet.autoFilter).toBe("A10:D12");
+    expect(sheet.getCell("C17").master.address).toBe("A17");
+    expect(sheet.getCell("A17").font).toMatchObject({ bold: true, underline: true });
     expect(sheet.getImages()).toHaveLength(1);
+    expect(sheet.getImages()[0]!.range.tl.col).toBeCloseTo(2.5927, 3);
+    expect(sheet.headerFooter).toBeNull();
   });
 });

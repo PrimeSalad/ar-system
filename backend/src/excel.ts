@@ -43,28 +43,55 @@ function formatPeriod(startDate: string, endDate: string): string {
   return `${formatLongDate(startDate)} - ${formatLongDate(endDate)}`;
 }
 
+function worksheetName(startDate: string, endDate: string): string {
+  const start = parseIsoDate(startDate);
+  const end = parseIsoDate(endDate);
+  const sameMonth = start.getUTCMonth() === end.getUTCMonth() && start.getUTCFullYear() === end.getUTCFullYear();
+  if (!sameMonth) return "ACCOMPLISHMENT";
+  const month = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" }).format(start).toUpperCase();
+  return `${month} ${start.getUTCDate()}-${end.getUTCDate()}, ${end.getUTCFullYear()}`.slice(0, 31);
+}
+
 function setCenteredHeader(
   sheet: ExcelJS.Worksheet,
   row: number,
   value: string,
-  options: { bold?: boolean; italic?: boolean; size?: number } = {},
+  options: { bold?: boolean; italic?: boolean; underline?: boolean; size?: number } = {},
 ): void {
   sheet.mergeCells(row, 1, row, 4);
   const cell = sheet.getCell(row, 1);
   cell.value = value;
-  cell.font = { ...documentFont, bold: options.bold, italic: options.italic, size: options.size ?? 10 };
+  cell.font = {
+    ...documentFont,
+    bold: options.bold,
+    italic: options.italic,
+    underline: options.underline,
+    size: options.size ?? 10,
+  };
   cell.alignment = { horizontal: "center", vertical: "middle" };
 }
 
 function estimateActivityHeight(description: string): number {
-  const lines = Math.max(2, Math.ceil(description.length / 105));
-  return Math.min(94, Math.max(33.6, lines * 15.2));
+  const lines = Math.max(1, Math.ceil(description.length / 90));
+  return Math.min(72, Math.round((12 + lines * 7.2) * 10) / 10);
 }
 
 function styleTableCell(cell: ExcelJS.Cell, size = 9): void {
   cell.font = { ...documentFont, size };
   cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   cell.border = thinBorder;
+}
+
+function descriptionValue(activity: ReportInput["activities"][number]): ExcelJS.CellRichTextValue | string {
+  const category = activity.category.trim();
+  const details = activity.details.trim();
+  if (category.toLowerCase() === "custom") return details;
+  return {
+    richText: [
+      { font: { ...documentFont, size: 9, bold: true }, text: `${category}: ` },
+      { font: { ...documentFont, size: 9 }, text: details },
+    ],
+  };
 }
 
 export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<Buffer> {
@@ -75,16 +102,25 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
   workbook.modified = new Date();
   workbook.company = report.office;
 
-  const sheet = workbook.addWorksheet("ACCOMPLISHMENT", {
-    views: [{ showGridLines: false }],
+  const sheet = workbook.addWorksheet(worksheetName(report.startDate, report.endDate), {
+    views: [{
+      showGridLines: true,
+      style: "pageBreakPreview",
+      zoomScale: 80,
+      zoomScaleNormal: 100,
+    }],
     pageSetup: {
       orientation: "portrait",
-      paperSize: 9,
+      paperSize: 14 as ExcelJS.PaperSize,
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
-      horizontalCentered: true,
-      margins: { left: 0.35, right: 0.35, top: 0.45, bottom: 0.35, header: 0.15, footer: 0.15 },
+      scale: 79,
+      horizontalDpi: 360,
+      verticalDpi: 360,
+      pageOrder: "downThenOver",
+      firstPageNumber: 1,
+      margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0, header: 0.3, footer: 0 },
     },
   });
 
@@ -102,8 +138,7 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
   setCenteredHeader(sheet, 5, report.office.toUpperCase(), { bold: true, italic: true });
   sheet.getRow(6).height = 8.4;
   setCenteredHeader(sheet, 7, report.title.toUpperCase(), { bold: true });
-  setCenteredHeader(sheet, 8, `As of ${formatPeriod(report.startDate, report.endDate)}`);
-  sheet.getRow(9).height = 8.4;
+  setCenteredHeader(sheet, 8, `As of ${formatPeriod(report.startDate, report.endDate)}`, { underline: true });
 
   sheet.mergeCells("B10:C10");
   const tableHeaders: Array<[string, string]> = [
@@ -119,7 +154,6 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
     cell.border = thinBorder;
   }
   sheet.getCell("C10").border = thinBorder;
-  sheet.getRow(10).height = 20;
 
   const activities = [...report.activities].sort((a, b) => a.date.localeCompare(b.date));
   let rowNumber = 11;
@@ -133,13 +167,14 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
     const unitsCell = sheet.getCell(rowNumber, 4);
 
     dateCell.value = formatLongDate(activity.date);
-    descriptionCell.value = description;
+    descriptionCell.value = descriptionValue(activity);
     unitsCell.value = activity.units;
 
-    styleTableCell(dateCell);
+    styleTableCell(dateCell, 9);
+    dateCell.numFmt = "@";
     styleTableCell(descriptionCell);
     styleTableCell(sheet.getCell(rowNumber, 3));
-    styleTableCell(unitsCell, 10);
+    styleTableCell(unitsCell, 9);
     sheet.getRow(rowNumber).height = estimateActivityHeight(description);
 
     const group = dateGroups.get(activity.date);
@@ -156,6 +191,8 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
     rowNumber += 1;
   }
 
+  sheet.autoFilter = `A10:D${rowNumber - 1}`;
+
   for (const group of dateGroups.values()) {
     if (group.end > group.start) {
       sheet.mergeCells(group.start, 1, group.end, 1);
@@ -164,6 +201,7 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
     }
   }
 
+  sheet.getRow(rowNumber).height = 16.2;
   const signatureStart = rowNumber + 1;
   const preparedNameRow = signatureStart + 3;
   const preparedPositionRow = signatureStart + 4;
@@ -173,27 +211,25 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
 
   sheet.getCell(signatureStart, 1).value = "Prepared by:";
   sheet.getCell(signatureStart, 1).font = documentFont;
+  sheet.mergeCells(signatureStart, 2, signatureStart, 3);
 
-  sheet.mergeCells(preparedNameRow, 1, preparedNameRow, 2);
+  sheet.mergeCells(preparedNameRow, 1, preparedNameRow, 3);
   sheet.getCell(preparedNameRow, 1).value = report.preparedBy.toUpperCase();
-  sheet.getCell(preparedNameRow, 1).font = { ...documentFont, bold: true };
-  sheet.getCell(preparedNameRow, 1).alignment = { horizontal: "center" };
+  sheet.getCell(preparedNameRow, 1).font = { ...documentFont, bold: true, underline: true };
+  sheet.getCell(preparedNameRow, 1).alignment = { horizontal: "left", indent: 5 };
 
-  sheet.mergeCells(preparedPositionRow, 1, preparedPositionRow, 2);
   sheet.getCell(preparedPositionRow, 1).value = report.preparedPosition.toUpperCase();
   sheet.getCell(preparedPositionRow, 1).font = documentFont;
-  sheet.getCell(preparedPositionRow, 1).alignment = { horizontal: "center" };
+  sheet.getCell(preparedPositionRow, 1).alignment = { horizontal: "left", indent: 5 };
 
   sheet.getCell(notedLabelRow, 3).value = "Noted by:";
   sheet.getCell(notedLabelRow, 3).font = documentFont;
   sheet.getCell(notedLabelRow, 3).alignment = { horizontal: "center" };
 
-  sheet.mergeCells(notedNameRow, 3, notedNameRow, 4);
   sheet.getCell(notedNameRow, 3).value = report.notedBy.toUpperCase();
   sheet.getCell(notedNameRow, 3).font = { ...documentFont, bold: true };
   sheet.getCell(notedNameRow, 3).alignment = { horizontal: "center" };
 
-  sheet.mergeCells(notedPositionRow, 3, notedPositionRow, 4);
   sheet.getCell(notedPositionRow, 3).value = report.notedPosition.toUpperCase();
   sheet.getCell(notedPositionRow, 3).font = documentFont;
   sheet.getCell(notedPositionRow, 3).alignment = { horizontal: "center" };
@@ -204,13 +240,12 @@ export async function buildAccomplishmentWorkbook(report: ReportInput): Promise<
     extension: "jpeg",
   });
   sheet.addImage(imageId, {
-    tl: { col: 2.73, row: 0.05 } as ExcelJS.Anchor,
-    br: { col: 2.9, row: 4.35 } as ExcelJS.Anchor,
+    tl: { col: 2.5927374322921355, row: 0 } as ExcelJS.Anchor,
+    br: { col: 2.9999987323591935, row: 3 } as ExcelJS.Anchor,
     editAs: "oneCell",
   });
 
   sheet.pageSetup.printArea = `A1:D${notedPositionRow}`;
-  sheet.headerFooter.oddFooter = "&CPage &P of &N";
 
   const output = await workbook.xlsx.writeBuffer();
   return Buffer.from(output);

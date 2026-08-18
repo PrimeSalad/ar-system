@@ -1,6 +1,6 @@
 # AccomplishPro
 
-AccomplishPro helps prepare the Municipality of Boac MSWDO accomplishment report using the format in `2026 ACCOMPLISHMENT TRUE .xlsx`. It is independently developed and is not affiliated with a government agency. It has a separate React/TypeScript frontend and Express/TypeScript backend, local draft storage, a live report preview, Gemini-assisted writing, browser printing/PDF, and exact-format Excel export.
+AccomplishPro helps prepare the Municipality of Boac MSWDO accomplishment report using the format in `2026 ACCOMPLISHMENT TRUE .xlsx`. It is independently developed and is not affiliated with a government agency. It has a separate React/TypeScript frontend and Express/TypeScript backend, local draft storage, a live report preview, Gemini-assisted writing, browser printing/PDF, and template-matched Excel export with the supplied A–D widths, heading styles, grouped dates, bold category labels, row borders, seal placement, page setup, and signatory spacing.
 
 ## What is included
 
