@@ -1,0 +1,28 @@
+{
+  "name": "accomplish-pro",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c cyan,green \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "typecheck": "npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
+    "test": "npm run test --workspace backend && npm run test --workspace frontend",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "start": "npm run start --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "overrides": {
+    "vite": "7.3.6",
+    "postcss": "8.5.25",
+    "uuid": "11.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

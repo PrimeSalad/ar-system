@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+backend/.env
+frontend/.env
+backend/data/reports.json
+backend/data/*.tmp
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+
+# Local source report and downloaded package archive are not part of the public app.
+2026 ACCOMPLISHMENT TRUE .xlsx
+xmlchars-2.2.0.tgz
