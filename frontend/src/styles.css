@@ -519,6 +519,38 @@ textarea:disabled {
   text-transform: uppercase;
 }
 
+.report-summary--empty {
+  padding: 16px 18px;
+  border: 1px solid #ccdce3;
+  border-radius: 12px;
+  background: #f6fafb;
+}
+
+.report-summary__content {
+  min-width: 0;
+}
+
+.report-summary__empty-title {
+  margin: 0;
+  color: var(--navy-900);
+  font-family: "Poppins", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.report-summary__empty-copy {
+  max-width: 580px;
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.report-summary__action {
+  flex: 0 0 auto;
+}
+
 .report-summary__sentence {
   margin: 0;
   color: var(--muted);
@@ -1787,6 +1819,7 @@ textarea[aria-invalid="true"] {
     flex-direction: column;
     gap: 12px;
   }
+  .report-summary__action { width: 100%; }
   input,
   select,
   textarea { font-size: 16px; }

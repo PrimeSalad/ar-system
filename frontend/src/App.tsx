@@ -14,6 +14,7 @@ import { ActivityList } from "./components/ActivityList";
 import { AiDraftModal } from "./components/AiDraftModal";
 import { DocumentPreview } from "./components/DocumentPreview";
 import { ReportDetails } from "./components/ReportDetails";
+import { ReportProgress } from "./components/ReportProgress";
 import { SESSION_KEY_NAME, SettingsModal } from "./components/SettingsModal";
 import { Sidebar } from "./components/Sidebar";
 import { useAutosave } from "./hooks/useAutosave";
@@ -269,21 +270,13 @@ export default function App() {
           </button>
         </section>
 
-        <section className="report-summary" aria-label="Report progress">
-          <div>
-            <p className="report-summary__label">Report progress</p>
-            <p className="report-summary__sentence">
-              <strong>{activityCount.toLocaleString()}</strong> {activityCount === 1 ? "accomplishment" : "accomplishments"} recorded across <strong>{activeDays.toLocaleString()}</strong> {activeDays === 1 ? "active day" : "active days"}, totaling <strong>{totalUnits.toLocaleString()}</strong> {totalUnits === 1 ? "unit" : "units"}.
-            </p>
-          </div>
-          <div
-            className={`document-state document-state--${report.status}`}
-            aria-label={`Document status: ${report.status === "ready" ? "Ready for signature" : "Draft in progress"}`}
-          >
-            <span className="document-state__dot" aria-hidden="true" />
-            <span>{report.status === "ready" ? "Ready for signature" : "Draft in progress"}</span>
-          </div>
-        </section>
+        <ReportProgress
+          activityCount={activityCount}
+          activeDays={activeDays}
+          totalUnits={totalUnits}
+          status={report.status}
+          onAddFirst={focusEntry}
+        />
 
         <ReportDetails report={report} onChange={updateReport} />
 
