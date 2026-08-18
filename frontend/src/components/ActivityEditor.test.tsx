@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import "@testing-library/jest-dom/vitest";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Report } from "../types";
+import { CATEGORY_OPTIONS, type Report } from "../types";
 import { ActivityEditor } from "./ActivityEditor";
 
 const report: Report = {
@@ -39,6 +39,7 @@ function renderEditor(overrides: Partial<ComponentProps<typeof ActivityEditor>> 
     onOpenAi: vi.fn(),
     onOpenSettings: vi.fn(),
     onImprove: vi.fn(),
+    onImproveBulk: vi.fn(),
     ...overrides,
   };
   render(<ActivityEditor {...props} />);
@@ -46,7 +47,7 @@ function renderEditor(overrides: Partial<ComponentProps<typeof ActivityEditor>> 
 }
 
 describe("ActivityEditor", () => {
-  it("adds several accomplishments for one shared day in a single submit", () => {
+  it("adds several same-day accomplishments with a separate category and units for every row", () => {
     const randomUUID = vi.spyOn(crypto, "randomUUID")
       .mockReturnValueOnce("c2a41e70-6fcb-4994-9f25-f5f043670d0a")
       .mockReturnValueOnce("caed31b6-6470-481c-bd8f-12e4983237f4")
@@ -61,15 +62,52 @@ describe("ActivityEditor", () => {
     });
 
     expect(screen.getByText("3 entries ready")).toBeInTheDocument();
+    fireEvent.change(screen.getAllByLabelText("Work category")[1]!, {
+      target: { value: CATEGORY_OPTIONS[2] },
+    });
+    fireEvent.change(screen.getAllByLabelText("Units")[2]!, {
+      target: { value: "7" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Add 3 entries" }));
 
     expect(randomUUID).toHaveBeenCalledTimes(3);
     expect(onSubmit).toHaveBeenCalledOnce();
     expect(vi.mocked(onSubmit).mock.calls[0]?.[0]).toMatchObject([
-      { date: "2025-01-15", details: "Prepared meeting invitations", units: 1 },
-      { date: "2025-01-15", details: "Distributed documents to four offices", units: 1 },
-      { date: "2025-01-15", details: "Updated the participant database", units: 1 },
+      { date: "2025-01-15", category: CATEGORY_OPTIONS[0], details: "Prepared meeting invitations", units: 1 },
+      { date: "2025-01-15", category: CATEGORY_OPTIONS[2], details: "Distributed documents to four offices", units: 1 },
+      { date: "2025-01-15", category: CATEGORY_OPTIONS[0], details: "Updated the participant database", units: 7 },
     ]);
+  });
+
+  it("improves every bulk line with Gemini while preserving its category and units", async () => {
+    const onImproveBulk = vi.fn().mockResolvedValue([
+      "Prepared meeting invitations.",
+      "Distributed documents to four offices.",
+    ]);
+    renderEditor({ onImproveBulk });
+
+    fireEvent.click(screen.getByRole("button", { name: "Bulk same-day" }));
+    fireEvent.change(screen.getByLabelText("What was accomplished? (one per line)"), {
+      target: { value: "nag prepare ng invitations\nnag distribute ng documents sa 4 offices" },
+    });
+    fireEvent.change(screen.getAllByLabelText("Work category")[1]!, {
+      target: { value: CATEGORY_OPTIONS[2] },
+    });
+    fireEvent.change(screen.getAllByLabelText("Units")[1]!, {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Improve all with AI" }));
+
+    await waitFor(() => expect(onImproveBulk).toHaveBeenCalledWith([
+      "nag prepare ng invitations",
+      "nag distribute ng documents sa 4 offices",
+    ]));
+    expect(screen.getByLabelText("What was accomplished? (one per line)")).toHaveValue(
+      "Prepared meeting invitations.\nDistributed documents to four offices.",
+    );
+    expect(screen.getAllByLabelText("Work category")[1]).toHaveValue(CATEGORY_OPTIONS[2]);
+    expect(screen.getAllByLabelText("Units")[1]).toHaveValue(4);
+    expect(screen.getByText("Gemini improved 2 descriptions. Review every category and unit before adding.")).toBeInTheDocument();
   });
 
   it("lets Gemini improve the rough description before it is saved", async () => {

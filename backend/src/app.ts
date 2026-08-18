@@ -9,6 +9,7 @@ import {
   GeminiConfigurationError,
   GeminiServiceError,
   improveActivityDescription,
+  improveActivityDescriptions,
   testGeminiConnection,
 } from "./gemini.js";
 import { CATEGORY_OPTIONS, reportInputSchema } from "./report-schema.js";
@@ -33,6 +34,11 @@ const draftRequestSchema = z.object({
 
 const descriptionRequestSchema = z.object({
   notes: z.string().trim().min(3).max(2_500),
+  office: z.string().trim().min(2).max(100),
+});
+
+const descriptionsRequestSchema = z.object({
+  notes: z.array(z.string().trim().min(3).max(2_500)).min(1).max(50),
   office: z.string().trim().min(2).max(100),
 });
 
@@ -104,6 +110,17 @@ export function createApp(options: { dataFile?: string } = {}) {
       const payload = descriptionRequestSchema.parse(request.body);
       const apiKey = request.header("x-gemini-api-key");
       const details = await improveActivityDescription(payload.notes, payload.office, apiKey);
+      response.json({ details });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/ai/descriptions", async (request, response, next) => {
+    try {
+      const payload = descriptionsRequestSchema.parse(request.body);
+      const apiKey = request.header("x-gemini-api-key");
+      const details = await improveActivityDescriptions(payload.notes, payload.office, apiKey);
       response.json({ details });
     } catch (error) {
       next(error);

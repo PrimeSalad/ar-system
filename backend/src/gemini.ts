@@ -40,6 +40,10 @@ const aiActivitySchema = activitySchema.omit({ id: true });
 const aiDescriptionSchema = z.object({
   details: z.string().trim().min(3).max(2_500),
 });
+const aiDescriptionListSchema = z.array(z.object({
+  index: z.number().int().positive(),
+  details: z.string().trim().min(3).max(2_500),
+})).min(1).max(50);
 
 export interface DraftRequest {
   notes: string;
@@ -286,6 +290,77 @@ ${notes}`;
   } catch {
     throw new GeminiServiceError(
       "Gemini returned an unreadable description. Please try again.",
+      "GEMINI_RESPONSE_INVALID",
+    );
+  }
+}
+
+export async function improveActivityDescriptions(
+  notes: string[],
+  office: string,
+  sessionApiKey?: string,
+): Promise<string[]> {
+  const { apiKey, model } = geminiConfig(sessionApiKey);
+  const ai = new GoogleGenAI({ apiKey });
+  const indexedNotes = notes.map((note, index) => ({ index: index + 1, note }));
+  const prompt = `You are an administrative writing assistant for ${office}, Municipality of Boac.
+Rewrite every rough accomplishment note as a separate, concise, professional report description.
+
+Rules:
+- Never invent an action, event, person, quantity, date, output, or result.
+- Understand English, Filipino, or Taglish and return professional English.
+- Use past tense, correct spelling and grammar, and preserve each note's original meaning.
+- Keep every stated name, quantity, date, and measurable result exactly supported by its source note.
+- Return exactly one description for every input item, in the same order and with the same index.
+- Never merge two notes, split one note, skip an item, or add an item.
+- Do not add a category, date, units, heading, or commentary.
+
+Rough accomplishment notes as JSON:
+${JSON.stringify(indexedNotes)}`;
+
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              index: { type: "integer" },
+              details: { type: "string" },
+            },
+            required: ["index", "details"],
+          },
+        },
+      },
+    });
+  } catch (error) {
+    throw toGeminiServiceError(error);
+  }
+
+  if (!response.text) {
+    throw new GeminiServiceError(
+      "Gemini returned empty descriptions. Add clearer rough notes and try again.",
+      "GEMINI_RESPONSE_INVALID",
+    );
+  }
+
+  try {
+    const improved = aiDescriptionListSchema.parse(JSON.parse(response.text));
+    if (
+      improved.length !== notes.length
+      || improved.some((item, index) => item.index !== index + 1)
+    ) {
+      throw new Error("Gemini changed the number or order of the notes");
+    }
+    return improved.map((item) => item.details);
+  } catch {
+    throw new GeminiServiceError(
+      "Gemini changed the number or order of the entries. Please try again.",
       "GEMINI_RESPONSE_INVALID",
     );
   }

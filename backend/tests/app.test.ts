@@ -73,6 +73,12 @@ describe("Gemini API", () => {
       .expect(503);
     expect(description.body.code).toBe("GEMINI_NOT_CONFIGURED");
 
+    const descriptions = await request(app)
+      .post("/api/ai/descriptions")
+      .send({ notes: ["Prepared the monthly report", "Distributed four letters"], office: "MSWDO" })
+      .expect(503);
+    expect(descriptions.body.code).toBe("GEMINI_NOT_CONFIGURED");
+
     const draft = await request(app)
       .post("/api/ai/draft")
       .send({

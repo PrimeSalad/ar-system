@@ -75,6 +75,21 @@ export async function improveActivityDescription(
   return result.details;
 }
 
+export async function improveActivityDescriptions(
+  notes: string[],
+  office: string,
+  sessionApiKey?: string,
+): Promise<string[]> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (sessionApiKey) headers["x-gemini-api-key"] = sessionApiKey;
+  const result = await apiFetch<{ details: string[] }>("/api/ai/descriptions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ notes, office }),
+  });
+  return result.details;
+}
+
 export async function generateAiDraft(
   report: Report,
   notes: string,

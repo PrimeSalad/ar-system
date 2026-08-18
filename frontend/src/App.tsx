@@ -8,7 +8,15 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { deleteReport, downloadExcel, getAiStatus, getReports, improveActivityDescription, saveReport } from "./api";
+import {
+  deleteReport,
+  downloadExcel,
+  getAiStatus,
+  getReports,
+  improveActivityDescription,
+  improveActivityDescriptions,
+  saveReport,
+} from "./api";
 import { ActivityEditor } from "./components/ActivityEditor";
 import { ActivityList } from "./components/ActivityList";
 import { AiDraftModal } from "./components/AiDraftModal";
@@ -125,6 +133,15 @@ export default function App() {
   const improveDescription = async (notes: string) => {
     if (!report) throw new Error("The active report is unavailable.");
     return improveActivityDescription(
+      notes,
+      report.office,
+      sessionStorage.getItem(SESSION_KEY_NAME) ?? undefined,
+    );
+  };
+
+  const improveDescriptions = async (notes: string[]) => {
+    if (!report) throw new Error("The active report is unavailable.");
+    return improveActivityDescriptions(
       notes,
       report.office,
       sessionStorage.getItem(SESSION_KEY_NAME) ?? undefined,
@@ -308,6 +325,7 @@ export default function App() {
               onOpenAi={() => setAiOpen(true)}
               onOpenSettings={() => setSettingsOpen(true)}
               onImprove={improveDescription}
+              onImproveBulk={improveDescriptions}
             />
             <ActivityList activities={report.activities} onEdit={(activity) => { setEditing(activity); focusEntry(); }} onDelete={handleDeleteActivity} onAddFocus={focusEntry} />
           </div>

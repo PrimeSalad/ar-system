@@ -1,5 +1,5 @@
 import { CalendarDays, Check, ListPlus, LoaderCircle, Plus, RotateCcw, Sparkles, WandSparkles } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { CATEGORY_OPTIONS, type Activity, type Report } from "../types";
 import { clampDateToPeriod, toIsoDate } from "../utils";
 
@@ -15,12 +15,19 @@ interface ActivityEditorProps {
   onOpenAi: () => void;
   onOpenSettings: () => void;
   onImprove: (notes: string) => Promise<string>;
+  onImproveBulk: (notes: string[]) => Promise<string[]>;
 }
 
 interface DraftActivity {
   date: string;
   category: string;
   details: string;
+  units: string;
+}
+
+interface BulkEntryDraft {
+  details: string;
+  category: string;
   units: string;
 }
 
@@ -43,6 +50,19 @@ export function parseBulkAccomplishments(value: string): string[] {
     .filter(Boolean);
 }
 
+function syncBulkRows(
+  details: string[],
+  current: BulkEntryDraft[],
+  defaultCategory: string,
+  defaultUnits: string,
+): BulkEntryDraft[] {
+  return details.map((detail, index) => ({
+    details: detail,
+    category: current[index]?.category ?? defaultCategory,
+    units: current[index]?.units ?? defaultUnits,
+  }));
+}
+
 export function ActivityEditor({
   report,
   editing,
@@ -52,14 +72,15 @@ export function ActivityEditor({
   onOpenAi,
   onOpenSettings,
   onImprove,
+  onImproveBulk,
 }: ActivityEditorProps) {
   const [draft, setDraft] = useState<DraftActivity>(() => freshDraft(report));
+  const [bulkRows, setBulkRows] = useState<BulkEntryDraft[]>([]);
   const [mode, setMode] = useState<EntryMode>("single");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [improving, setImproving] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<AiFeedback>(null);
   const isBulk = mode === "bulk" && !editing;
-  const bulkEntries = useMemo(() => parseBulkAccomplishments(draft.details), [draft.details]);
 
   useEffect(() => {
     if (editing) {
@@ -79,24 +100,38 @@ export function ActivityEditor({
             : clampDateToPeriod(current.date, report.startDate, report.endDate),
       }));
     }
+    setBulkRows([]);
     setErrors({});
     setAiFeedback(null);
   }, [editing, report.id, report.startDate, report.endDate]);
 
   const update = (field: keyof DraftActivity, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
+    if (field === "details" && isBulk) {
+      const details = parseBulkAccomplishments(value);
+      setBulkRows((current) => syncBulkRows(details, current, draft.category, draft.units));
+    }
     setErrors((current) => ({ ...current, [field]: "" }));
     if (field === "details") setAiFeedback(null);
   };
 
   const switchMode = (nextMode: EntryMode) => {
     setMode(nextMode);
+    if (nextMode === "bulk") {
+      setBulkRows((current) => syncBulkRows(
+        parseBulkAccomplishments(draft.details),
+        current,
+        draft.category,
+        draft.units,
+      ));
+    }
     setErrors({});
     setAiFeedback(null);
   };
 
   const reset = () => {
     setDraft(freshDraft(report));
+    setBulkRows([]);
     setMode("single");
     setErrors({});
     setAiFeedback(null);
@@ -135,11 +170,67 @@ export function ActivityEditor({
     }
   };
 
+  const handleImproveBulk = async () => {
+    if (!aiReady) {
+      onOpenSettings();
+      return;
+    }
+    if (bulkRows.length === 0) {
+      setErrors((current) => ({ ...current, details: "Enter at least one accomplishment before asking Gemini to improve it." }));
+      return;
+    }
+    if (bulkRows.length > MAX_BULK_ENTRIES) {
+      setErrors((current) => ({ ...current, details: `Improve up to ${MAX_BULK_ENTRIES} accomplishments at a time.` }));
+      return;
+    }
+    if (bulkRows.some((row) => row.details.length < 3)) {
+      setErrors((current) => ({ ...current, details: "Each accomplishment must contain at least 3 characters." }));
+      return;
+    }
+    if (bulkRows.some((row) => row.details.length > 2_500)) {
+      setErrors((current) => ({ ...current, details: "Keep each accomplishment within 2,500 characters." }));
+      return;
+    }
+
+    setImproving(true);
+    setAiFeedback(null);
+    try {
+      const improved = await onImproveBulk(bulkRows.map((row) => row.details));
+      if (improved.length !== bulkRows.length) {
+        throw new Error("Gemini changed the number of entries. Please try again.");
+      }
+      setBulkRows((current) => improved.map((details, index) => ({
+        ...current[index]!,
+        details,
+      })));
+      setDraft((current) => ({ ...current, details: improved.join("\n") }));
+      setErrors((current) => ({ ...current, details: "" }));
+      setAiFeedback({
+        tone: "success",
+        message: `Gemini improved ${improved.length} ${improved.length === 1 ? "description" : "descriptions"}. Review every category and unit before adding.`,
+      });
+    } catch (error) {
+      setAiFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Gemini could not improve the descriptions.",
+      });
+    } finally {
+      setImproving(false);
+    }
+  };
+
+  const updateBulkRow = (index: number, field: "category" | "units", value: string) => {
+    setBulkRows((current) => current.map((row, rowIndex) => (
+      rowIndex === index ? { ...row, [field]: value } : row
+    )));
+    setErrors((current) => ({ ...current, [`bulk-units-${index}`]: "" }));
+  };
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     const nextErrors: Record<string, string> = {};
     const units = Number(draft.units);
-    const details = isBulk ? bulkEntries : [draft.details.trim()].filter(Boolean);
+    const details = isBulk ? bulkRows.map((row) => row.details) : [draft.details.trim()].filter(Boolean);
 
     if (!draft.date) nextErrors.date = "Choose the accomplishment date.";
     else if (draft.date < report.startDate || draft.date > report.endDate) {
@@ -156,7 +247,17 @@ export function ActivityEditor({
     } else if (details.some((detail) => detail.length > 2_500)) {
       nextErrors.details = "Keep each accomplishment within 2,500 characters.";
     }
-    if (!Number.isInteger(units) || units < 1) nextErrors.units = "Units must be a positive whole number.";
+    if (!isBulk && (!Number.isInteger(units) || units < 1)) {
+      nextErrors.units = "Units must be a positive whole number.";
+    }
+    if (isBulk) {
+      bulkRows.forEach((row, index) => {
+        const rowUnits = Number(row.units);
+        if (!Number.isInteger(rowUnits) || rowUnits < 1) {
+          nextErrors[`bulk-units-${index}`] = "Enter a positive whole number.";
+        }
+      });
+    }
     if (!editing && report.activities.length + details.length > MAX_REPORT_ENTRIES) {
       const remaining = Math.max(0, MAX_REPORT_ENTRIES - report.activities.length);
       nextErrors.details = remaining
@@ -168,14 +269,23 @@ export function ActivityEditor({
       return;
     }
 
-    const activities = details.map((detail) => ({
-      id: editing?.id ?? crypto.randomUUID(),
-      date: draft.date,
-      category: draft.category,
-      details: detail,
-      units,
-    }));
+    const activities = isBulk
+      ? bulkRows.map((row) => ({
+          id: crypto.randomUUID(),
+          date: draft.date,
+          category: row.category,
+          details: row.details,
+          units: Number(row.units),
+        }))
+      : details.map((detail) => ({
+          id: editing?.id ?? crypto.randomUUID(),
+          date: draft.date,
+          category: draft.category,
+          details: detail,
+          units,
+        }));
     onSubmit(activities);
+    setBulkRows([]);
     setDraft((current) => ({
       ...freshDraft(report),
       date: current.date,
@@ -224,7 +334,7 @@ export function ActivityEditor({
       )}
 
       <form className="entry-form" onSubmit={handleSubmit} noValidate>
-        <div className="entry-form__topline">
+        <div className={`entry-form__topline${isBulk ? " entry-form__topline--bulk" : ""}`}>
           <div className="field-group">
             <label htmlFor="activity-date">{isBulk ? "Shared date" : "Date"}</label>
             <div className="input-with-icon">
@@ -243,36 +353,40 @@ export function ActivityEditor({
             {errors.date && <p className="field-error" id="activity-date-error">{errors.date}</p>}
           </div>
 
-          <div className="field-group field-group--units">
-            <label htmlFor="activity-units">{isBulk ? "Units per entry" : "Units"}</label>
-            <input
-              id="activity-units"
-              type="number"
-              min="1"
-              step="1"
-              inputMode="numeric"
-              value={draft.units}
-              onChange={(event) => update("units", event.target.value)}
-              aria-invalid={Boolean(errors.units)}
-              aria-describedby={errors.units ? "activity-units-error" : undefined}
-            />
-            {errors.units && <p className="field-error" id="activity-units-error">{errors.units}</p>}
-          </div>
+          {!isBulk && (
+            <div className="field-group field-group--units">
+              <label htmlFor="activity-units">Units</label>
+              <input
+                id="activity-units"
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={draft.units}
+                onChange={(event) => update("units", event.target.value)}
+                aria-invalid={Boolean(errors.units)}
+                aria-describedby={errors.units ? "activity-units-error" : undefined}
+              />
+              {errors.units && <p className="field-error" id="activity-units-error">{errors.units}</p>}
+            </div>
+          )}
         </div>
 
-        <div className="field-group">
-          <label htmlFor="activity-category">{isBulk ? "Shared work category" : "Work category"}</label>
-          <select
-            id="activity-category"
-            value={draft.category}
-            onChange={(event) => update("category", event.target.value)}
-          >
-            {CATEGORY_OPTIONS.map((category) => (
-              <option key={category} value={category}>{category}</option>
-            ))}
-            <option value="Custom">Custom / description only</option>
-          </select>
-        </div>
+        {!isBulk && (
+          <div className="field-group">
+            <label htmlFor="activity-category">Work category</label>
+            <select
+              id="activity-category"
+              value={draft.category}
+              onChange={(event) => update("category", event.target.value)}
+            >
+              {CATEGORY_OPTIONS.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+              <option value="Custom">Custom / description only</option>
+            </select>
+          </div>
+        )}
 
         <div className="field-group">
           <label htmlFor="activity-details">
@@ -301,15 +415,29 @@ export function ActivityEditor({
             ) : (
               <p className="field-help" id="activity-details-help">
                 {isBulk
-                  ? "Every non-empty line becomes a separate editable row with the shared date, category, and units."
+                  ? "Every non-empty line becomes a separate row. Set its own work category and units below."
                   : "Type rough English, Filipino, or Taglish. Gemini can improve it without inventing facts."}
               </p>
             )}
 
             {isBulk ? (
-              <span className="bulk-ready-count" aria-live="polite">
-                {bulkEntries.length} {bulkEntries.length === 1 ? "entry" : "entries"} ready
-              </span>
+              <div className="bulk-assist-actions">
+                <span className="bulk-ready-count" aria-live="polite">
+                  {bulkRows.length} {bulkRows.length === 1 ? "entry" : "entries"} ready
+                </span>
+                <button
+                  className="button button--ai button--field-ai"
+                  type="button"
+                  onClick={aiReady ? handleImproveBulk : onOpenSettings}
+                  disabled={improving}
+                  aria-busy={improving}
+                >
+                  {improving
+                    ? <LoaderCircle className="spin" aria-hidden="true" size={16} />
+                    : <WandSparkles aria-hidden="true" size={16} />}
+                  {improving ? "Improving all…" : aiReady ? "Improve all with AI" : "Connect Gemini"}
+                </button>
+              </div>
             ) : (
               <button
                 className="button button--ai button--field-ai"
@@ -327,6 +455,60 @@ export function ActivityEditor({
           </div>
         </div>
 
+        {isBulk && bulkRows.length > 0 && (
+          <fieldset className="bulk-entry-review" disabled={improving}>
+            <legend>Review each entry</legend>
+            <p className="bulk-entry-review__help">
+              Category and units apply only to their own accomplishment.
+            </p>
+            <div className="bulk-entry-review__list">
+              {bulkRows.map((row, index) => {
+                const unitsError = errors[`bulk-units-${index}`];
+                return (
+                  <div className="bulk-entry-row" key={`${index}-${row.details}`}>
+                    <div className="bulk-entry-row__header">
+                      <span className="bulk-entry-row__number" aria-hidden="true">{index + 1}</span>
+                      <p>{row.details}</p>
+                    </div>
+                    <div className="bulk-entry-row__controls">
+                      <div className="field-group">
+                        <label htmlFor={`bulk-category-${index}`}>Work category</label>
+                        <select
+                          id={`bulk-category-${index}`}
+                          value={row.category}
+                          onChange={(event) => updateBulkRow(index, "category", event.target.value)}
+                        >
+                          {CATEGORY_OPTIONS.map((category) => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
+                          <option value="Custom">Custom / description only</option>
+                        </select>
+                      </div>
+                      <div className="field-group field-group--units">
+                        <label htmlFor={`bulk-units-${index}`}>Units</label>
+                        <input
+                          id={`bulk-units-${index}`}
+                          type="number"
+                          min="1"
+                          step="1"
+                          inputMode="numeric"
+                          value={row.units}
+                          onChange={(event) => updateBulkRow(index, "units", event.target.value)}
+                          aria-invalid={Boolean(unitsError)}
+                          aria-describedby={unitsError ? `bulk-units-${index}-error` : undefined}
+                        />
+                        {unitsError && (
+                          <p className="field-error" id={`bulk-units-${index}-error`}>{unitsError}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+
         <div className="entry-form__actions">
           {(editing || draft.details) && (
             <button className="button button--ghost" type="button" onClick={reset} disabled={improving}>
@@ -343,8 +525,8 @@ export function ActivityEditor({
             {editing
               ? "Save changes"
               : isBulk
-                ? bulkEntries.length
-                  ? `Add ${bulkEntries.length} ${bulkEntries.length === 1 ? "entry" : "entries"}`
+                ? bulkRows.length
+                  ? `Add ${bulkRows.length} ${bulkRows.length === 1 ? "entry" : "entries"}`
                   : "Add entries"
                 : "Add to report"}
           </button>

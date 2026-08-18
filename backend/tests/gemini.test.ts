@@ -16,6 +16,7 @@ import {
   draftActivities,
   GeminiServiceError,
   improveActivityDescription,
+  improveActivityDescriptions,
   testGeminiConnection,
 } from "../src/gemini.js";
 
@@ -48,6 +49,28 @@ describe("Gemini drafting", () => {
     expect(details).toBe("Prepared and distributed 12 meeting invitations to SK chairpersons.");
     expect(mocks.generateContent.mock.calls[0]?.[0].contents).toContain("Never invent");
     expect(mocks.generateContent.mock.calls[0]?.[0].contents).toContain("one description only");
+  });
+
+  it("improves bulk accomplishments without merging or reordering them", async () => {
+    mocks.generateContent.mockResolvedValue({
+      text: JSON.stringify([
+        { index: 1, details: "Prepared meeting invitations." },
+        { index: 2, details: "Distributed documents to four offices." },
+      ]),
+    });
+
+    const details = await improveActivityDescriptions(
+      ["nag prepare ng invitations", "nag distribute ng documents sa 4 offices"],
+      "MSWDO",
+      "session-key",
+    );
+
+    expect(details).toEqual([
+      "Prepared meeting invitations.",
+      "Distributed documents to four offices.",
+    ]);
+    expect(mocks.generateContent.mock.calls[0]?.[0].contents).toContain("exactly one description for every input item");
+    expect(mocks.generateContent.mock.calls[0]?.[0].contents).toContain("Never merge two notes");
   });
 
   it("turns a valid structured provider response into editable activities", async () => {

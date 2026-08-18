@@ -51,7 +51,7 @@ Gemini receives only the rough notes submitted to the AI drafting dialog plus th
 ## Everyday workflow
 
 1. Set the reporting start and end dates.
-2. Add accomplishments manually, or paste rough notes into **Draft with AI**.
+2. Add one accomplishment, use **Bulk same-day** for one line per task with separate categories and units, or paste rough notes into **Draft with AI**.
 3. Review dates, categories, descriptions, and units in the activity list.
 4. Expand **Report details & signatories** if the office header or names need changes.
 5. Review the live report preview.
@@ -106,6 +106,8 @@ design-system/MASTER.md  Product UI rules
 - `DELETE /api/reports/:id` — delete a report
 - `GET /api/ai/status` — Gemini configuration status
 - `POST /api/ai/test` — verify the API key and configured model
+- `POST /api/ai/description` — improve one rough accomplishment without adding facts
+- `POST /api/ai/descriptions` — improve up to 50 accomplishment lines without merging or reordering them
 - `POST /api/ai/draft` — convert rough notes into structured activities
 - `POST /api/exports/xlsx` — generate the formatted Excel workbook
 
