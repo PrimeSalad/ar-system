@@ -14,5 +14,4 @@ Thumbs.db
 # Local source report and downloaded package archive are not part of the public app.
 2026 ACCOMPLISHMENT TRUE .xlsx
 xmlchars-2.2.0.tgz
-
 /.env.local
