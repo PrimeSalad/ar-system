@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck } from "lucide-react";
+import { AlertCircle, CheckCircle2, ExternalLink, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { testAiConnection } from "../api";
 import type { AiStatus } from "../types";
@@ -29,7 +29,10 @@ export function SettingsModal({ open, onClose, status, onSaved }: SettingsModalP
   }, [open]);
 
   const hasEnteredKey = Boolean(key.trim());
-  const connectionReady = status.configured || hasEnteredKey;
+  const savedSessionKey = sessionStorage.getItem(SESSION_KEY_NAME);
+  const hasSavedSessionKey = Boolean(savedSessionKey && savedSessionKey === key.trim());
+  const connectionReady = status.configured || hasSavedSessionKey || testState === "success";
+  const canSave = hasEnteredKey ? hasSavedSessionKey || testState === "success" : status.configured;
 
   const handleTest = async () => {
     setTestState("testing");
@@ -46,6 +49,7 @@ export function SettingsModal({ open, onClose, status, onSaved }: SettingsModalP
 
   const handleSave = () => {
     const trimmed = key.trim();
+    if (trimmed && testState !== "success" && !hasSavedSessionKey) return;
     if (trimmed) sessionStorage.setItem(SESSION_KEY_NAME, trimmed);
     else sessionStorage.removeItem(SESSION_KEY_NAME);
     onSaved();
@@ -57,23 +61,74 @@ export function SettingsModal({ open, onClose, status, onSaved }: SettingsModalP
       open={open}
       onClose={onClose}
       title="Gemini settings"
-      description="Connect a free Google AI Studio key for AI-assisted drafting."
+      description="Connect your Google AI Studio key for AI-assisted drafting."
+      size="large"
     >
       <div className={`connection-card ${connectionReady ? "connection-card--ready" : ""}`}>
         <div className="connection-card__icon">
           <ShieldCheck aria-hidden="true" size={22} />
         </div>
         <div>
-          <strong>{status.configured ? "Server key configured" : hasEnteredKey ? "Session key entered" : "Gemini setup required"}</strong>
+          <strong>
+            {status.configured
+              ? "Server connection available"
+              : testState === "success"
+                ? "Key verified"
+                : hasSavedSessionKey
+                  ? "Session key ready"
+                  : hasEnteredKey
+                    ? "Key ready to test"
+                    : "Gemini setup required"}
+          </strong>
           <p>
             {status.configured
-              ? `Test the server connection before drafting. Model: ${status.model}.`
-              : hasEnteredKey
-                ? `Test this key before saving it for the browser session. Model: ${status.model}.`
-                : `Enter a Google AI Studio key below, then test the connection. Model: ${status.model}.`}
+              ? `No browser key is required. You can test the shared server connection below. Model: ${status.model}.`
+              : testState === "success"
+                ? `This key is ready to save for the current browser tab. Model: ${status.model}.`
+                : hasSavedSessionKey
+                  ? `A key is already saved in this browser tab. Test it again if the connection stops working. Model: ${status.model}.`
+                  : hasEnteredKey
+                    ? `Select Test connection to verify this key before saving it. Model: ${status.model}.`
+                    : `Follow the three steps below to create and verify a key. Model: ${status.model}.`}
           </p>
         </div>
       </div>
+
+      {!status.configured && (
+        <section className="api-key-guide" aria-labelledby="api-key-guide-title">
+          <div className="api-key-guide__header">
+            <div>
+              <p className="api-key-guide__eyebrow">One-time setup</p>
+              <h3 id="api-key-guide-title">Get a Gemini API key</h3>
+              <p>Create the key in Google AI Studio, then return here to verify it.</p>
+            </div>
+            <a
+              className="button button--outline api-key-guide__link"
+              href="https://aistudio.google.com/apikey"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open Google AI Studio
+              <ExternalLink aria-hidden="true" size={16} />
+            </a>
+          </div>
+
+          <ol className="api-key-steps">
+            <li>
+              <span aria-hidden="true">1</span>
+              <div><strong>Sign in</strong><p>Open Google AI Studio and sign in with your Google account.</p></div>
+            </li>
+            <li>
+              <span aria-hidden="true">2</span>
+              <div><strong>Create a key</strong><p>Choose or create a Google Cloud project, then select Create API key.</p></div>
+            </li>
+            <li>
+              <span aria-hidden="true">3</span>
+              <div><strong>Paste and verify</strong><p>Copy the key, paste it below, select Test connection, then save it.</p></div>
+            </li>
+          </ol>
+        </section>
+      )}
 
       <div className="field-group">
         <label htmlFor="gemini-key">Gemini API key</label>
@@ -88,7 +143,7 @@ export function SettingsModal({ open, onClose, status, onSaved }: SettingsModalP
               setTestState("idle");
               setTestMessage("");
             }}
-            placeholder={status.configured ? "Server key already configured" : "AIza..."}
+            placeholder={status.configured ? "Optional: use a different key" : "Paste your Google AI Studio key"}
             autoComplete="off"
             spellCheck={false}
           />
@@ -102,7 +157,7 @@ export function SettingsModal({ open, onClose, status, onSaved }: SettingsModalP
           </button>
         </div>
         <p className="field-help">
-          A key entered here stays only in this browser tab and is sent to your local backend only when you use AI.
+          Your key is stored only in this browser tab. It is sent to the Render API only when you test the connection or use Gemini drafting, and is never included in the frontend bundle.
         </p>
       </div>
 
@@ -133,8 +188,8 @@ export function SettingsModal({ open, onClose, status, onSaved }: SettingsModalP
           {testState === "testing" && <LoaderCircle className="spin" aria-hidden="true" size={17} />}
           {testState === "testing" ? "Testing…" : "Test connection"}
         </button>
-        <button className="button button--primary" type="button" onClick={handleSave} disabled={testState === "testing"}>
-          Save for this session
+        <button className="button button--primary" type="button" onClick={handleSave} disabled={testState === "testing" || !canSave}>
+          {status.configured && !hasEnteredKey ? "Use server connection" : "Save verified key"}
         </button>
       </div>
     </Modal>

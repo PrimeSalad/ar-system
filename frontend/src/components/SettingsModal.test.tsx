@@ -27,6 +27,11 @@ describe("Gemini settings", () => {
       />,
     );
 
+    expect(screen.getByRole("link", { name: "Open Google AI Studio" })).toHaveAttribute(
+      "href",
+      "https://aistudio.google.com/apikey",
+    );
+
     fireEvent.change(screen.getByLabelText("Gemini API key"), { target: { value: "test-key" } });
     fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
 
@@ -34,7 +39,8 @@ describe("Gemini settings", () => {
     expect(await screen.findByText("Connection verified with gemini-3.5-flash.")).toBeInTheDocument();
   });
 
-  it("saves a session key only in session storage", () => {
+  it("saves a verified session key only in session storage", async () => {
+    vi.mocked(testAiConnection).mockResolvedValue({ ok: true, model: "gemini-3.5-flash" });
     const onClose = vi.fn();
     const onSaved = vi.fn();
     render(
@@ -47,7 +53,10 @@ describe("Gemini settings", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Gemini API key"), { target: { value: "  session-key  " } });
-    fireEvent.click(screen.getByRole("button", { name: "Save for this session" }));
+    expect(screen.getByRole("button", { name: "Save verified key" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await screen.findByText("Connection verified with gemini-3.5-flash.");
+    fireEvent.click(screen.getByRole("button", { name: "Save verified key" }));
 
     expect(sessionStorage.getItem(SESSION_KEY_NAME)).toBe("session-key");
     expect(onSaved).toHaveBeenCalledOnce();

@@ -178,7 +178,7 @@ export default function App() {
     try {
       await downloadExcel(report);
       updateReport({ status: "ready" });
-      setToast({ message: "Excel report generated in the official Boac format.", tone: "success" });
+      setToast({ message: "Excel report generated in the Boac report format.", tone: "success" });
     } catch (error) {
       setToast({ message: error instanceof Error ? error.message : "Could not build the Excel file.", tone: "error" });
     } finally {
@@ -196,7 +196,7 @@ export default function App() {
       <main className="loading-screen">
         <div className="loading-mark"><FileSpreadsheet aria-hidden="true" size={30} /></div>
         <h1>Opening AccomplishPro</h1>
-        <p>Preparing your report workspace and official template…</p>
+        <p>Preparing your report workspace and template…</p>
         <div className="loading-bar"><span /></div>
       </main>
     );

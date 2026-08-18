@@ -119,7 +119,7 @@ describe("Gemini drafting", () => {
     });
   });
 
-  it("safely maps an unknown category to the official catch-all category", async () => {
+  it("safely maps an unknown category to the approved catch-all category", async () => {
     mocks.generateContent.mockResolvedValue({
       text: JSON.stringify([
         {

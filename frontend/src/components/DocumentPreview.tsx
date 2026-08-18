@@ -32,7 +32,7 @@ export function DocumentPreview({ report, exporting, onExport, onPrint }: Docume
       <div className="preview-toolbar">
         <div>
           <p className="eyebrow">Document preview</p>
-          <h2 id="preview-title">Official report</h2>
+          <h2 id="preview-title">Report preview</h2>
         </div>
         <div className="preview-toolbar__actions">
           <button className="button button--icon-text button--outline" type="button" onClick={onPrint}>
@@ -48,31 +48,31 @@ export function DocumentPreview({ report, exporting, onExport, onPrint }: Docume
 
       <div className="paper-stage">
         <article className="report-paper" aria-label="Accomplishment report document preview">
-          <header className="official-header">
-            <img src="/boac-seal.jpg" alt="Municipality of Boac official seal" />
+          <header className="report-header">
+            <img src="/boac-seal.jpg" alt="Municipality of Boac seal" />
             <p>{report.country}</p>
             <p>{report.province}</p>
             <p>{report.municipality}</p>
-            <div className="official-header__gap" />
-            <p className="official-header__office">{report.office}</p>
-            <div className="official-header__gap official-header__gap--small" />
+            <div className="report-header__gap" />
+            <p className="report-header__office">{report.office}</p>
+            <div className="report-header__gap report-header__gap--small" />
             <h3>{report.title}</h3>
             <p>As of {formatPeriod(report.startDate, report.endDate)}</p>
           </header>
 
-          <table className="official-table">
+          <table className="report-table">
             <caption className="sr-only">Accomplishment activities grouped by date</caption>
             <colgroup>
-              <col className="official-table__date" />
-              <col className="official-table__description" />
-              <col className="official-table__units" />
+              <col className="report-table__date" />
+              <col className="report-table__description" />
+              <col className="report-table__units" />
             </colgroup>
             <thead>
               <tr><th scope="col">DATE</th><th scope="col">DESCRIPTION</th><th scope="col">UNITS</th></tr>
             </thead>
             <tbody>
               {groups.length === 0 ? (
-                <tr className="official-table__empty"><td>—</td><td>Add accomplishments to build this report.</td><td>—</td></tr>
+                <tr className="report-table__empty"><td>—</td><td>Add accomplishments to build this report.</td><td>—</td></tr>
               ) : groups.flatMap((group) =>
                 group.activities.map((activity, index) => (
                   <tr key={activity.id}>

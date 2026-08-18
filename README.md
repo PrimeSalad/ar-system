@@ -1,10 +1,10 @@
 # AccomplishPro
 
-AccomplishPro automates the Municipality of Boac MSWDO accomplishment report using the format in `2026 ACCOMPLISHMENT TRUE .xlsx`. It has a separate React/TypeScript frontend and Express/TypeScript backend, local draft storage, a live official-document preview, Gemini-assisted writing, browser printing/PDF, and exact-format Excel export.
+AccomplishPro helps prepare the Municipality of Boac MSWDO accomplishment report using the format in `2026 ACCOMPLISHMENT TRUE .xlsx`. It is independently developed and is not affiliated with a government agency. It has a separate React/TypeScript frontend and Express/TypeScript backend, local draft storage, a live report preview, Gemini-assisted writing, browser printing/PDF, and exact-format Excel export.
 
 ## What is included
 
-- Official Boac header and municipal seal
+- Boac report header and municipal seal
 - DATE / DESCRIPTION / UNITS table with wrapped descriptions
 - Automatic date grouping and merged Excel date cells
 - Dynamic rows and reporting periods
@@ -31,19 +31,20 @@ Open [http://localhost:5173](http://localhost:5173).
 
 The first launch creates a blank report for the current half-month. Drafts are autosaved to `backend/data/reports.json`.
 
-## Connect the free Gemini API
+## Connect the Gemini API
 
-1. Create a key in [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Open `backend/.env` and set:
+1. Open [Google AI Studio](https://aistudio.google.com/apikey) and sign in.
+2. Choose or create a Google Cloud project, then select **Create API key**.
+3. Copy the key and either paste it into **Gemini settings** in the app or add it to `backend/.env`:
 
 ```dotenv
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-3.5-flash
 ```
 
-3. Restart `npm run dev`.
+4. Restart `npm run dev` if you configured `backend/.env`.
 
-For a temporary setup, click **Gemini settings** in the app, enter the key, and use **Test connection** before saving. A session key is stored only in that browser tab and sent to the local backend only for an AI request. A permanent key stays on the backend and is never included in the frontend bundle.
+For a browser-session setup, click **Gemini settings**, follow the built-in tutorial, paste the key, and use **Test connection** before saving. A session key is stored only in that browser tab and sent to the Render API only when testing or drafting. A permanent server key stays on the backend and is never included in the frontend bundle.
 
 Gemini receives only the rough notes submitted to the AI drafting dialog plus the report period, office name, fallback date, and fallback units. Quantities written in the notes take priority; the selected fallback units are used when an entry has no stated quantity. Generated rows remain editable, and the prompt explicitly prohibits inventing facts, dates, quantities, people, or results.
 
@@ -53,7 +54,7 @@ Gemini receives only the rough notes submitted to the AI drafting dialog plus th
 2. Add accomplishments manually, or paste rough notes into **Draft with AI**.
 3. Review dates, categories, descriptions, and units in the activity list.
 4. Expand **Report details & signatories** if the office header or names need changes.
-5. Review the live official preview.
+5. Review the live report preview.
 6. Select **Export Excel** for the formatted workbook, or **Print / PDF** for a browser printout.
 
 ## Production build
@@ -87,7 +88,7 @@ backend/
   assets/boac-seal.jpg
   data/                  Local report storage
   src/app.ts             Express API and production static host
-  src/excel.ts           Official Excel generator
+  src/excel.ts           Excel generator
   src/gemini.ts          Gemini structured drafting
   src/report-schema.ts   Shared validation rules
   src/store.ts           Atomic JSON persistence
@@ -106,7 +107,7 @@ design-system/MASTER.md  Product UI rules
 - `GET /api/ai/status` — Gemini configuration status
 - `POST /api/ai/test` — verify the API key and configured model
 - `POST /api/ai/draft` — convert rough notes into structured activities
-- `POST /api/exports/xlsx` — generate the official Excel workbook
+- `POST /api/exports/xlsx` — generate the formatted Excel workbook
 
 ## Configuration
 

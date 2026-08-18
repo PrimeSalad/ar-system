@@ -69,7 +69,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <p className="sidebar__footer">Official accomplishment workspace · Municipality of Boac</p>
+      <p className="sidebar__footer">Independent report workspace · Municipality of Boac</p>
     </aside>
   );
 }
