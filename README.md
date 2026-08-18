@@ -1,5 +1,7 @@
 # AccomplishPro
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PrimeSalad/ar-system)
+
 AccomplishPro automates the Municipality of Boac MSWDO accomplishment report using the format in `2026 ACCOMPLISHMENT TRUE .xlsx`. It has a separate React/TypeScript frontend and Express/TypeScript backend, local draft storage, a live official-document preview, Gemini-assisted writing, browser printing/PDF, and exact-format Excel export.
 
 ## What is included
@@ -63,7 +65,13 @@ npm run check
 npm start
 ```
 
-`npm run check` runs TypeScript validation, six automated tests, and both production builds. After building, `npm start` serves the API and the compiled frontend together at [http://localhost:4000](http://localhost:4000). The source applications remain separated in `frontend/` and `backend/`.
+`npm run check` runs TypeScript validation, automated tests, and both production builds. After building, `npm start` serves the API and the compiled frontend together at [http://localhost:4000](http://localhost:4000). The source applications remain separated in `frontend/` and `backend/`.
+
+## Deploy on Render
+
+The repository includes a `render.yaml` Blueprint for a single full-stack web service in Render's Singapore region. Click **Deploy to Render** above, connect this GitHub repository, and Render will run the clean install, production build, health check, and server start commands automatically.
+
+The app can use a browser-session Gemini key without a server secret. To configure Gemini for everyone, add `GEMINI_API_KEY` in the Render service environment. Free Render services use an ephemeral filesystem, so saved reports can reset after a restart or redeploy; attach a persistent disk or external datastore before relying on server-side storage for production records.
 
 ## Project structure
 
