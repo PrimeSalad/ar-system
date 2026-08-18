@@ -69,7 +69,7 @@ npm start
 
 ## Deploy on Render
 
-The repository includes a `render.yaml` Blueprint for a single full-stack web service in Render's Singapore region. Click **Deploy to Render** above, connect this GitHub repository, and Render will run the clean install, production build, health check, and server start commands automatically.
+The repository includes a `render.yaml` Blueprint for a single full-stack web service in Render's Singapore region. Click **Deploy to Render** above, connect this GitHub repository, and Render will install the build tooling, create both production bundles, prune development dependencies, run the health check, and start the server automatically.
 
 The app can use a browser-session Gemini key without a server secret. To configure Gemini for everyone, add `GEMINI_API_KEY` in the Render service environment. Free Render services use an ephemeral filesystem, so saved reports can reset after a restart or redeploy; attach a persistent disk or external datastore before relying on server-side storage for production records.
 
