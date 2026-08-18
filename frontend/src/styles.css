@@ -755,6 +755,14 @@ textarea:disabled {
   gap: 16px;
 }
 
+.section-heading__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: var(--amber-700);
@@ -785,6 +793,56 @@ textarea:disabled {
 .entry-form {
   display: grid;
   gap: 17px;
+}
+
+.csv-import-area {
+  display: grid;
+  gap: 8px;
+  margin: -10px 0 18px;
+}
+
+.csv-import-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.csv-import-help code {
+  padding: 1px 4px;
+  color: var(--navy-800);
+  border-radius: 4px;
+  background: var(--surface-soft);
+  font-size: 0.95em;
+}
+
+.csv-import-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.csv-import-feedback svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.csv-import-feedback--success {
+  color: var(--green-700);
+  border-color: #bad8c7;
+  background: #eff8f2;
+}
+
+.csv-import-feedback--error {
+  color: var(--red-700);
+  border-color: #f3c3be;
+  background: #fff6f5;
 }
 
 .entry-mode-switch {
@@ -2158,6 +2216,13 @@ textarea[aria-invalid="true"] {
   textarea { font-size: 16px; }
   .section-heading--split { display: block; }
   .section-heading--split .button { margin-top: 12px; }
+  .section-heading__actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr;
+    margin-top: 12px;
+  }
+  .section-heading__actions .button { width: 100%; margin-top: 0; }
   .entry-mode-switch {
     display: grid;
     width: 100%;

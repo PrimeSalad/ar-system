@@ -130,6 +130,24 @@ export default function App() {
     setToast({ message, tone: "success" });
   };
 
+  const importActivities = (
+    activities: Activity[],
+    range: { startDate: string; endDate: string },
+  ) => {
+    if (!report || activities.length === 0) return;
+    updateReport({
+      startDate: range.startDate,
+      endDate: range.endDate,
+      activities: [...report.activities, ...activities],
+    });
+    setEditing(null);
+    const activeDays = countWorkDays(activities);
+    setToast({
+      message: `${activities.length} accomplishments imported across ${activeDays} active ${activeDays === 1 ? "day" : "days"}.`,
+      tone: "success",
+    });
+  };
+
   const improveDescription = async (notes: string) => {
     if (!report) throw new Error("The active report is unavailable.");
     return improveActivityDescription(
@@ -321,6 +339,7 @@ export default function App() {
               editing={editing}
               aiReady={aiStatus.configured || hasSessionKey}
               onSubmit={saveActivities}
+              onImport={importActivities}
               onCancelEdit={() => setEditing(null)}
               onOpenAi={() => setAiOpen(true)}
               onOpenSettings={() => setSettingsOpen(true)}

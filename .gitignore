@@ -15,3 +15,6 @@ Thumbs.db
 2026 ACCOMPLISHMENT TRUE .xlsx
 xmlchars-2.2.0.tgz
 /.env.local
+
+# User-provided report imports stay local and are never published.
+/user-imports/*.csv

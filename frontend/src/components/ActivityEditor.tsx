@@ -1,16 +1,30 @@
-import { CalendarDays, Check, ListPlus, LoaderCircle, Plus, RotateCcw, Sparkles, WandSparkles } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  AlertCircle,
+  CalendarDays,
+  Check,
+  ListPlus,
+  LoaderCircle,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  Upload,
+  WandSparkles,
+} from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { parseActivityCsv } from "../csv";
 import { CATEGORY_OPTIONS, type Activity, type Report } from "../types";
 import { clampDateToPeriod, toIsoDate } from "../utils";
 
 const MAX_BULK_ENTRIES = 50;
 const MAX_REPORT_ENTRIES = 250;
+const MAX_CSV_FILE_BYTES = 1_048_576;
 
 interface ActivityEditorProps {
   report: Report;
   editing: Activity | null;
   aiReady: boolean;
   onSubmit: (activities: Activity[]) => void;
+  onImport: (activities: Activity[], range: { startDate: string; endDate: string }) => void;
   onCancelEdit: () => void;
   onOpenAi: () => void;
   onOpenSettings: () => void;
@@ -33,6 +47,7 @@ interface BulkEntryDraft {
 
 type EntryMode = "single" | "bulk";
 type AiFeedback = { tone: "success" | "error"; message: string } | null;
+type ImportFeedback = { tone: "success" | "error"; message: string } | null;
 
 function freshDraft(report: Report): DraftActivity {
   return {
@@ -68,18 +83,22 @@ export function ActivityEditor({
   editing,
   aiReady,
   onSubmit,
+  onImport,
   onCancelEdit,
   onOpenAi,
   onOpenSettings,
   onImprove,
   onImproveBulk,
 }: ActivityEditorProps) {
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<DraftActivity>(() => freshDraft(report));
   const [bulkRows, setBulkRows] = useState<BulkEntryDraft[]>([]);
   const [mode, setMode] = useState<EntryMode>("single");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [improving, setImproving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<AiFeedback>(null);
+  const [importFeedback, setImportFeedback] = useState<ImportFeedback>(null);
   const isBulk = mode === "bulk" && !editing;
 
   useEffect(() => {
@@ -104,6 +123,58 @@ export function ActivityEditor({
     setErrors({});
     setAiFeedback(null);
   }, [editing, report.id, report.startDate, report.endDate]);
+
+  useEffect(() => {
+    setImportFeedback(null);
+  }, [report.id]);
+
+  const handleCsvFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportFeedback(null);
+    try {
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        throw new Error("Choose a .csv file using the columns date, category, details, and units.");
+      }
+      if (file.size > MAX_CSV_FILE_BYTES) {
+        throw new Error("The CSV file is larger than 1 MB. Split it into smaller files and try again.");
+      }
+
+      const parsedRows = parseActivityCsv(await file.text());
+      if (report.activities.length + parsedRows.length > MAX_REPORT_ENTRIES) {
+        const remaining = Math.max(0, MAX_REPORT_ENTRIES - report.activities.length);
+        throw new Error(remaining
+          ? `This report can accept ${remaining} more ${remaining === 1 ? "row" : "rows"}; the CSV contains ${parsedRows.length}.`
+          : "This report already contains the maximum of 250 entries.");
+      }
+
+      const importedActivities: Activity[] = parsedRows.map((row) => ({
+        id: crypto.randomUUID(),
+        ...row,
+      }));
+      const dates = parsedRows.map((row) => row.date).sort();
+      const startDate = dates[0]! < report.startDate ? dates[0]! : report.startDate;
+      const endDate = dates.at(-1)! > report.endDate ? dates.at(-1)! : report.endDate;
+      const periodExpanded = startDate !== report.startDate || endDate !== report.endDate;
+
+      onImport(importedActivities, { startDate, endDate });
+      setImportFeedback({
+        tone: "success",
+        message: `${importedActivities.length} ${importedActivities.length === 1 ? "accomplishment" : "accomplishments"} imported${periodExpanded ? "; the reporting period was expanded to include every date" : ""}.`,
+      });
+    } catch (error) {
+      setImportFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "The CSV could not be imported.",
+      });
+    } finally {
+      input.value = "";
+      setImporting(false);
+    }
+  };
 
   const update = (field: keyof DraftActivity, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -316,11 +387,58 @@ export function ActivityEditor({
               : "Record one measurable output, or let Gemini improve your rough wording."}
           </p>
         </div>
-        <button className="button button--ai button--compact" type="button" onClick={onOpenAi}>
-          <Sparkles aria-hidden="true" size={17} />
-          Turn notes into entries
-        </button>
+        <div className="section-heading__actions">
+          {!editing && (
+            <>
+              <input
+                ref={csvInputRef}
+                className="sr-only"
+                type="file"
+                accept=".csv,text/csv"
+                aria-label="Choose CSV file"
+                onChange={handleCsvFile}
+              />
+              <button
+                className="button button--outline button--compact"
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+                disabled={importing}
+                aria-busy={importing}
+                aria-describedby="csv-import-help"
+              >
+                {importing
+                  ? <LoaderCircle className="spin" aria-hidden="true" size={17} />
+                  : <Upload aria-hidden="true" size={17} />}
+                {importing ? "Importing…" : "Import CSV"}
+              </button>
+            </>
+          )}
+          <button className="button button--ai button--compact" type="button" onClick={onOpenAi}>
+            <Sparkles aria-hidden="true" size={17} />
+            Turn notes into entries
+          </button>
+        </div>
       </div>
+
+      {!editing && (
+        <div className="csv-import-area">
+          <p className="csv-import-help" id="csv-import-help">
+            CSV columns: <code>date</code>, <code>category</code>, <code>details</code>, <code>units</code>. Dates use YYYY-MM-DD; importing can expand the reporting period.
+          </p>
+          {importFeedback && (
+            <div
+              className={`csv-import-feedback csv-import-feedback--${importFeedback.tone}`}
+              role={importFeedback.tone === "error" ? "alert" : "status"}
+              aria-live="polite"
+            >
+              {importFeedback.tone === "success"
+                ? <Check aria-hidden="true" size={17} />
+                : <AlertCircle aria-hidden="true" size={17} />}
+              <span>{importFeedback.message}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {!editing && (
         <div className="entry-mode-switch" role="group" aria-label="Entry method">
@@ -380,6 +498,9 @@ export function ActivityEditor({
               value={draft.category}
               onChange={(event) => update("category", event.target.value)}
             >
+              {!CATEGORY_OPTIONS.some((category) => category === draft.category) && draft.category !== "Custom" && (
+                <option value={draft.category}>{draft.category}</option>
+              )}
               {CATEGORY_OPTIONS.map((category) => (
                 <option key={category} value={category}>{category}</option>
               ))}

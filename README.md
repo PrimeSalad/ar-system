@@ -11,6 +11,7 @@ AccomplishPro helps prepare the Municipality of Boac MSWDO accomplishment report
 - Prepared by / Noted by signatories
 - Live print-oriented preview
 - Manual activity editor with validation
+- Validated CSV import for multi-date accomplishments
 - Gemini batch drafting from rough daily notes
 - Autosaved reports and report switching
 - Excel download and Print / PDF output
@@ -51,11 +52,20 @@ Gemini receives only the rough notes submitted to the AI drafting dialog plus th
 ## Everyday workflow
 
 1. Set the reporting start and end dates.
-2. Add one accomplishment, use **Bulk same-day** for one line per task with separate categories and units, or paste rough notes into **Draft with AI**.
+2. Add one accomplishment, use **Bulk same-day** for one line per task with separate categories and units, select **Import CSV** for a multi-date file, or paste rough notes into **Draft with AI**.
 3. Review dates, categories, descriptions, and units in the activity list, or select a description in the document preview to edit its complete row there.
 4. Expand **Report details & signatories** if the office header or names need changes.
 5. Review the live report preview; preview edits require **Save changes** before printing or exporting.
 6. Select **Export Excel** for the formatted workbook, or **Print / PDF** for a browser printout.
+
+### CSV import
+
+Use a UTF-8 `.csv` file with the columns `date`, `category`, `details`, and `units`. Dates must use `YYYY-MM-DD`, and units must be positive whole numbers. Fields containing commas or line breaks must be enclosed in double quotes. The importer validates every row before adding anything, accepts up to 250 rows, and automatically expands the active reporting period when the file includes an earlier or later date.
+
+```csv
+date,category,details,units
+2026-08-03,Coordination,"Prepared invitations, kits, and certificates.",5
+```
 
 ## Production build
 

@@ -35,6 +35,7 @@ function renderEditor(overrides: Partial<ComponentProps<typeof ActivityEditor>> 
     editing: null,
     aiReady: true,
     onSubmit: vi.fn(),
+    onImport: vi.fn(),
     onCancelEdit: vi.fn(),
     onOpenAi: vi.fn(),
     onOpenSettings: vi.fn(),
@@ -136,5 +137,60 @@ describe("ActivityEditor", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Connect Gemini" }));
     expect(onOpenSettings).toHaveBeenCalledOnce();
+  });
+
+  it("imports CSV rows and expands both sides of the reporting period", async () => {
+    vi.spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("b471e769-6c6b-4b24-bff6-51c58ccb9773")
+      .mockReturnValueOnce("71ab1d30-eb88-45e0-b6ea-55ae7f4cab21");
+    const { onImport } = renderEditor();
+    const csv = [
+      "date,category,details,units",
+      '2024-12-31,Coordination,"Prepared invitations, kits, and certificates.",5',
+      "2025-01-20,Database,Updated profiling records.,10",
+    ].join("\n");
+    const file = new File([csv], "accomplishments.csv", { type: "text/csv" });
+    Object.defineProperty(file, "text", { value: vi.fn().mockResolvedValue(csv) });
+
+    fireEvent.change(screen.getByLabelText("Choose CSV file"), { target: { files: [file] } });
+
+    await waitFor(() => expect(onImport).toHaveBeenCalledOnce());
+    expect(vi.mocked(onImport).mock.calls[0]?.[0]).toEqual([
+      {
+        id: "b471e769-6c6b-4b24-bff6-51c58ccb9773",
+        date: "2024-12-31",
+        category: "Coordination",
+        details: "Prepared invitations, kits, and certificates.",
+        units: 5,
+      },
+      {
+        id: "71ab1d30-eb88-45e0-b6ea-55ae7f4cab21",
+        date: "2025-01-20",
+        category: "Database",
+        details: "Updated profiling records.",
+        units: 10,
+      },
+    ]);
+    expect(vi.mocked(onImport).mock.calls[0]?.[1]).toEqual({
+      startDate: "2024-12-31",
+      endDate: "2025-01-20",
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "2 accomplishments imported; the reporting period was expanded to include every date.",
+    );
+  });
+
+  it("shows the failing row and imports nothing when CSV validation fails", async () => {
+    const { onImport } = renderEditor();
+    const csv = "date,category,details,units\n2025-01-05,Coordination,Requested updates.,zero";
+    const file = new File([csv], "invalid.csv", { type: "text/csv" });
+    Object.defineProperty(file, "text", { value: vi.fn().mockResolvedValue(csv) });
+
+    fireEvent.change(screen.getByLabelText("Choose CSV file"), { target: { files: [file] } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "CSV row 2: units must be a positive whole number.",
+    );
+    expect(onImport).not.toHaveBeenCalled();
   });
 });
