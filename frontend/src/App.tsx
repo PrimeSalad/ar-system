@@ -8,7 +8,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { deleteReport, downloadExcel, getAiStatus, getReports, saveReport } from "./api";
+import { deleteReport, downloadExcel, getAiStatus, getReports, improveActivityDescription, saveReport } from "./api";
 import { ActivityEditor } from "./components/ActivityEditor";
 import { ActivityList } from "./components/ActivityList";
 import { AiDraftModal } from "./components/AiDraftModal";
@@ -19,7 +19,7 @@ import { SESSION_KEY_NAME, SettingsModal } from "./components/SettingsModal";
 import { Sidebar } from "./components/Sidebar";
 import { useAutosave } from "./hooks/useAutosave";
 import type { Activity, AiStatus, Report, SaveState } from "./types";
-import { countWorkDays, createBlankReport, formatPeriod, reportIssues } from "./utils";
+import { countWorkDays, createBlankReport, formatLongDate, formatPeriod, reportIssues } from "./utils";
 
 interface ToastState {
   message: string;
@@ -102,16 +102,33 @@ export default function App() {
     setReport((current) => (current ? { ...current, ...changes } : current));
   };
 
-  const saveActivity = (activity: Activity) => {
-    if (!report) return;
-    const exists = report.activities.some((item) => item.id === activity.id);
+  const saveActivities = (activities: Activity[]) => {
+    if (!report || activities.length === 0) return;
+    const existingIds = new Set(report.activities.map((item) => item.id));
+    const replacements = new Map(activities.map((activity) => [activity.id, activity]));
     updateReport({
-      activities: exists
-        ? report.activities.map((item) => (item.id === activity.id ? activity : item))
-        : [...report.activities, activity],
+      activities: [
+        ...report.activities.map((item) => replacements.get(item.id) ?? item),
+        ...activities.filter((activity) => !existingIds.has(activity.id)),
+      ],
     });
     setEditing(null);
-    setToast({ message: exists ? "Accomplishment updated." : "Accomplishment added to the report.", tone: "success" });
+    const updatedExisting = activities.length === 1 && existingIds.has(activities[0]!.id);
+    const message = updatedExisting
+      ? "Accomplishment updated."
+      : activities.length === 1
+        ? "Accomplishment added to the report."
+        : `${activities.length} accomplishments added for ${formatLongDate(activities[0]!.date)}.`;
+    setToast({ message, tone: "success" });
+  };
+
+  const improveDescription = async (notes: string) => {
+    if (!report) throw new Error("The active report is unavailable.");
+    return improveActivityDescription(
+      notes,
+      report.office,
+      sessionStorage.getItem(SESSION_KEY_NAME) ?? undefined,
+    );
   };
 
   const addAiActivities = (activities: Activity[]) => {
@@ -282,7 +299,16 @@ export default function App() {
 
         <div className="workspace-grid">
           <div className="editor-column">
-            <ActivityEditor report={report} editing={editing} onSubmit={saveActivity} onCancelEdit={() => setEditing(null)} onOpenAi={() => setAiOpen(true)} />
+            <ActivityEditor
+              report={report}
+              editing={editing}
+              aiReady={aiStatus.configured || hasSessionKey}
+              onSubmit={saveActivities}
+              onCancelEdit={() => setEditing(null)}
+              onOpenAi={() => setAiOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onImprove={improveDescription}
+            />
             <ActivityList activities={report.activities} onEdit={(activity) => { setEditing(activity); focusEntry(); }} onDelete={handleDeleteActivity} onAddFocus={focusEntry} />
           </div>
           <DocumentPreview report={report} exporting={exporting} onExport={handleExport} onPrint={() => window.print()} />

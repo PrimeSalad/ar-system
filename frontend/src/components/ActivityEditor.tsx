@@ -1,14 +1,20 @@
-import { CalendarDays, Check, Plus, RotateCcw, Sparkles } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { CalendarDays, Check, ListPlus, LoaderCircle, Plus, RotateCcw, Sparkles, WandSparkles } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CATEGORY_OPTIONS, type Activity, type Report } from "../types";
 import { clampDateToPeriod, toIsoDate } from "../utils";
+
+const MAX_BULK_ENTRIES = 50;
+const MAX_REPORT_ENTRIES = 250;
 
 interface ActivityEditorProps {
   report: Report;
   editing: Activity | null;
-  onSubmit: (activity: Activity) => void;
+  aiReady: boolean;
+  onSubmit: (activities: Activity[]) => void;
   onCancelEdit: () => void;
   onOpenAi: () => void;
+  onOpenSettings: () => void;
+  onImprove: (notes: string) => Promise<string>;
 }
 
 interface DraftActivity {
@@ -17,6 +23,9 @@ interface DraftActivity {
   details: string;
   units: string;
 }
+
+type EntryMode = "single" | "bulk";
+type AiFeedback = { tone: "success" | "error"; message: string } | null;
 
 function freshDraft(report: Report): DraftActivity {
   return {
@@ -27,12 +36,34 @@ function freshDraft(report: Report): DraftActivity {
   };
 }
 
-export function ActivityEditor({ report, editing, onSubmit, onCancelEdit, onOpenAi }: ActivityEditorProps) {
+export function parseBulkAccomplishments(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^(?:[-*•]\s+|\d+[.)]\s+)/, "").trim())
+    .filter(Boolean);
+}
+
+export function ActivityEditor({
+  report,
+  editing,
+  aiReady,
+  onSubmit,
+  onCancelEdit,
+  onOpenAi,
+  onOpenSettings,
+  onImprove,
+}: ActivityEditorProps) {
   const [draft, setDraft] = useState<DraftActivity>(() => freshDraft(report));
+  const [mode, setMode] = useState<EntryMode>("single");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [improving, setImproving] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<AiFeedback>(null);
+  const isBulk = mode === "bulk" && !editing;
+  const bulkEntries = useMemo(() => parseBulkAccomplishments(draft.details), [draft.details]);
 
   useEffect(() => {
     if (editing) {
+      setMode("single");
       setDraft({
         date: editing.date,
         category: editing.category,
@@ -49,54 +80,131 @@ export function ActivityEditor({ report, editing, onSubmit, onCancelEdit, onOpen
       }));
     }
     setErrors({});
+    setAiFeedback(null);
   }, [editing, report.id, report.startDate, report.endDate]);
 
   const update = (field: keyof DraftActivity, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
+    if (field === "details") setAiFeedback(null);
+  };
+
+  const switchMode = (nextMode: EntryMode) => {
+    setMode(nextMode);
+    setErrors({});
+    setAiFeedback(null);
   };
 
   const reset = () => {
     setDraft(freshDraft(report));
+    setMode("single");
     setErrors({});
+    setAiFeedback(null);
     onCancelEdit();
+  };
+
+  const handleImprove = async () => {
+    const roughNote = draft.details.trim();
+    if (!aiReady) {
+      onOpenSettings();
+      return;
+    }
+    if (roughNote.length < 3) {
+      setErrors((current) => ({ ...current, details: "Type a rough accomplishment first, then ask Gemini to improve it." }));
+      return;
+    }
+    if (roughNote.length > 2_500) {
+      setErrors((current) => ({ ...current, details: "Keep the rough accomplishment within 2,500 characters." }));
+      return;
+    }
+
+    setImproving(true);
+    setAiFeedback(null);
+    try {
+      const improved = await onImprove(roughNote);
+      setDraft((current) => ({ ...current, details: improved }));
+      setErrors((current) => ({ ...current, details: "" }));
+      setAiFeedback({ tone: "success", message: "Gemini improved the description. Review it before adding." });
+    } catch (error) {
+      setAiFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Gemini could not improve the description.",
+      });
+    } finally {
+      setImproving(false);
+    }
   };
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     const nextErrors: Record<string, string> = {};
     const units = Number(draft.units);
+    const details = isBulk ? bulkEntries : [draft.details.trim()].filter(Boolean);
+
     if (!draft.date) nextErrors.date = "Choose the accomplishment date.";
     else if (draft.date < report.startDate || draft.date > report.endDate) {
       nextErrors.date = "Date must be inside the reporting period.";
     }
-    if (!draft.details.trim() || draft.details.trim().length < 3) {
-      nextErrors.details = "Describe the accomplishment in at least 3 characters.";
+    if (isBulk && details.length === 0) {
+      nextErrors.details = "Enter at least one accomplishment, with one item per line.";
+    } else if (isBulk && details.length > MAX_BULK_ENTRIES) {
+      nextErrors.details = `Add up to ${MAX_BULK_ENTRIES} accomplishments at a time.`;
+    } else if (details.some((detail) => detail.length < 3)) {
+      nextErrors.details = isBulk
+        ? "Each accomplishment must contain at least 3 characters."
+        : "Describe the accomplishment in at least 3 characters.";
+    } else if (details.some((detail) => detail.length > 2_500)) {
+      nextErrors.details = "Keep each accomplishment within 2,500 characters.";
     }
     if (!Number.isInteger(units) || units < 1) nextErrors.units = "Units must be a positive whole number.";
+    if (!editing && report.activities.length + details.length > MAX_REPORT_ENTRIES) {
+      const remaining = Math.max(0, MAX_REPORT_ENTRIES - report.activities.length);
+      nextErrors.details = remaining
+        ? `This report can accept ${remaining} more ${remaining === 1 ? "entry" : "entries"}.`
+        : "This report already contains the maximum of 250 entries.";
+    }
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       return;
     }
 
-    onSubmit({
+    const activities = details.map((detail) => ({
       id: editing?.id ?? crypto.randomUUID(),
       date: draft.date,
       category: draft.category,
-      details: draft.details.trim(),
+      details: detail,
       units,
-    });
-    setDraft((current) => ({ ...freshDraft(report), date: current.date }));
+    }));
+    onSubmit(activities);
+    setDraft((current) => ({
+      ...freshDraft(report),
+      date: current.date,
+      category: isBulk ? current.category : CATEGORY_OPTIONS[0],
+      units: isBulk ? current.units : "1",
+    }));
     setErrors({});
+    setAiFeedback(null);
   };
+
+  const detailsFeedbackId = errors.details
+    ? "activity-details-error"
+    : aiFeedback
+      ? "activity-details-ai-feedback"
+      : "activity-details-help";
 
   return (
     <section className="card entry-card" aria-labelledby="entry-title">
       <div className="section-heading section-heading--split">
         <div>
-          <p className="eyebrow">New report entry</p>
-          <h2 id="entry-title">{editing ? "Edit accomplishment" : "Add accomplishment"}</h2>
-          <p>Record one measurable output, or let Gemini structure rough notes for you.</p>
+          <p className="eyebrow">{isBulk ? "Bulk report entries" : "New report entry"}</p>
+          <h2 id="entry-title">
+            {editing ? "Edit accomplishment" : isBulk ? "Add several accomplishments" : "Add accomplishment"}
+          </h2>
+          <p>
+            {isBulk
+              ? "Use one date for the day, then enter each completed task on its own line."
+              : "Record one measurable output, or let Gemini improve your rough wording."}
+          </p>
         </div>
         <button className="button button--ai button--compact" type="button" onClick={onOpenAi}>
           <Sparkles aria-hidden="true" size={17} />
@@ -104,10 +212,21 @@ export function ActivityEditor({ report, editing, onSubmit, onCancelEdit, onOpen
         </button>
       </div>
 
+      {!editing && (
+        <div className="entry-mode-switch" role="group" aria-label="Entry method">
+          <button type="button" aria-pressed={mode === "single"} onClick={() => switchMode("single")}>
+            <Plus aria-hidden="true" size={16} /> Single entry
+          </button>
+          <button type="button" aria-pressed={mode === "bulk"} onClick={() => switchMode("bulk")}>
+            <ListPlus aria-hidden="true" size={16} /> Bulk same-day
+          </button>
+        </div>
+      )}
+
       <form className="entry-form" onSubmit={handleSubmit} noValidate>
         <div className="entry-form__topline">
           <div className="field-group">
-            <label htmlFor="activity-date">Date</label>
+            <label htmlFor="activity-date">{isBulk ? "Shared date" : "Date"}</label>
             <div className="input-with-icon">
               <CalendarDays aria-hidden="true" size={17} />
               <input
@@ -125,7 +244,7 @@ export function ActivityEditor({ report, editing, onSubmit, onCancelEdit, onOpen
           </div>
 
           <div className="field-group field-group--units">
-            <label htmlFor="activity-units">Units</label>
+            <label htmlFor="activity-units">{isBulk ? "Units per entry" : "Units"}</label>
             <input
               id="activity-units"
               type="number"
@@ -142,7 +261,7 @@ export function ActivityEditor({ report, editing, onSubmit, onCancelEdit, onOpen
         </div>
 
         <div className="field-group">
-          <label htmlFor="activity-category">Work category</label>
+          <label htmlFor="activity-category">{isBulk ? "Shared work category" : "Work category"}</label>
           <select
             id="activity-category"
             value={draft.category}
@@ -156,33 +275,78 @@ export function ActivityEditor({ report, editing, onSubmit, onCancelEdit, onOpen
         </div>
 
         <div className="field-group">
-          <label htmlFor="activity-details">What was accomplished?</label>
+          <label htmlFor="activity-details">
+            {isBulk ? "What was accomplished? (one per line)" : "What was accomplished?"}
+          </label>
           <textarea
             id="activity-details"
-            rows={4}
+            rows={isBulk ? 8 : 4}
             value={draft.details}
             onChange={(event) => update("details", event.target.value)}
-            placeholder="Example: Communicated with 12 SK chairpersons regarding the upcoming quarterly meeting"
-            aria-invalid={Boolean(errors.details)}
-            aria-describedby={errors.details ? "activity-details-error" : "activity-details-help"}
+            placeholder={isBulk
+              ? "Prepared meeting invitations\nDistributed documents to four offices\nUpdated the participant database"
+              : "Example: Communicated with 12 SK chairpersons regarding the upcoming quarterly meeting"}
+            maxLength={isBulk ? 30_000 : 2_500}
+            disabled={improving}
+            aria-invalid={Boolean(errors.details || aiFeedback?.tone === "error")}
+            aria-describedby={detailsFeedbackId}
           />
-          {errors.details ? (
-            <p className="field-error" id="activity-details-error">{errors.details}</p>
-          ) : (
-            <p className="field-help" id="activity-details-help">Use past tense and include the measurable result. The category is added automatically.</p>
-          )}
+          <div className="field-assist-row">
+            {errors.details ? (
+              <p className="field-error" id="activity-details-error">{errors.details}</p>
+            ) : aiFeedback ? (
+              <p className={`field-feedback field-feedback--${aiFeedback.tone}`} id="activity-details-ai-feedback" role="status">
+                {aiFeedback.message}
+              </p>
+            ) : (
+              <p className="field-help" id="activity-details-help">
+                {isBulk
+                  ? "Every non-empty line becomes a separate editable row with the shared date, category, and units."
+                  : "Type rough English, Filipino, or Taglish. Gemini can improve it without inventing facts."}
+              </p>
+            )}
+
+            {isBulk ? (
+              <span className="bulk-ready-count" aria-live="polite">
+                {bulkEntries.length} {bulkEntries.length === 1 ? "entry" : "entries"} ready
+              </span>
+            ) : (
+              <button
+                className="button button--ai button--field-ai"
+                type="button"
+                onClick={aiReady ? handleImprove : onOpenSettings}
+                disabled={improving}
+                aria-busy={improving}
+              >
+                {improving
+                  ? <LoaderCircle className="spin" aria-hidden="true" size={16} />
+                  : <WandSparkles aria-hidden="true" size={16} />}
+                {improving ? "Improving…" : aiReady ? "Improve with AI" : "Connect Gemini"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="entry-form__actions">
           {(editing || draft.details) && (
-            <button className="button button--ghost" type="button" onClick={reset}>
+            <button className="button button--ghost" type="button" onClick={reset} disabled={improving}>
               <RotateCcw aria-hidden="true" size={17} />
               Reset
             </button>
           )}
-          <button className="button button--primary" type="submit">
-            {editing ? <Check aria-hidden="true" size={17} /> : <Plus aria-hidden="true" size={17} />}
-            {editing ? "Save changes" : "Add to report"}
+          <button className="button button--primary" type="submit" disabled={improving}>
+            {editing
+              ? <Check aria-hidden="true" size={17} />
+              : isBulk
+                ? <ListPlus aria-hidden="true" size={17} />
+                : <Plus aria-hidden="true" size={17} />}
+            {editing
+              ? "Save changes"
+              : isBulk
+                ? bulkEntries.length
+                  ? `Add ${bulkEntries.length} ${bulkEntries.length === 1 ? "entry" : "entries"}`
+                  : "Add entries"
+                : "Add to report"}
           </button>
         </div>
       </form>

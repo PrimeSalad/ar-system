@@ -37,6 +37,9 @@ const rawAiActivitySchema = z.object({
 }).passthrough();
 
 const aiActivitySchema = activitySchema.omit({ id: true });
+const aiDescriptionSchema = z.object({
+  details: z.string().trim().min(3).max(2_500),
+});
 
 export interface DraftRequest {
   notes: string;
@@ -228,6 +231,63 @@ export async function testGeminiConnection(sessionApiKey?: string): Promise<{ mo
     return { model };
   } catch (error) {
     throw toGeminiServiceError(error);
+  }
+}
+
+export async function improveActivityDescription(
+  notes: string,
+  office: string,
+  sessionApiKey?: string,
+): Promise<string> {
+  const { apiKey, model } = geminiConfig(sessionApiKey);
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `You are an administrative writing assistant for ${office}, Municipality of Boac.
+Rewrite the user's rough accomplishment note as one concise, professional report description.
+
+Rules:
+- Never invent an action, event, person, quantity, date, output, or result.
+- Understand English, Filipino, or Taglish and return professional English.
+- Use past tense, correct spelling and grammar, and preserve the original meaning.
+- Keep every stated name, quantity, date, and measurable result exactly supported by the note.
+- Return one description only. Do not add a category, date, units, heading, or commentary.
+
+Rough accomplishment note:
+${notes}`;
+
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            details: { type: "string" },
+          },
+          required: ["details"],
+        },
+      },
+    });
+  } catch (error) {
+    throw toGeminiServiceError(error);
+  }
+
+  if (!response.text) {
+    throw new GeminiServiceError(
+      "Gemini returned an empty description. Add a clearer rough note and try again.",
+      "GEMINI_RESPONSE_INVALID",
+    );
+  }
+
+  try {
+    return aiDescriptionSchema.parse(JSON.parse(response.text)).details;
+  } catch {
+    throw new GeminiServiceError(
+      "Gemini returned an unreadable description. Please try again.",
+      "GEMINI_RESPONSE_INVALID",
+    );
   }
 }
 

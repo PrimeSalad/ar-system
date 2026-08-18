@@ -15,6 +15,7 @@ vi.mock("@google/genai", () => ({ GoogleGenAI: mocks.GoogleGenAI }));
 import {
   draftActivities,
   GeminiServiceError,
+  improveActivityDescription,
   testGeminiConnection,
 } from "../src/gemini.js";
 
@@ -31,6 +32,24 @@ beforeEach(() => {
 });
 
 describe("Gemini drafting", () => {
+  it("improves one rough accomplishment without requesting invented details", async () => {
+    mocks.generateContent.mockResolvedValue({
+      text: JSON.stringify({
+        details: "Prepared and distributed 12 meeting invitations to SK chairpersons.",
+      }),
+    });
+
+    const details = await improveActivityDescription(
+      "nag prepare at distribute ako ng 12 invitations sa SK chairpersons",
+      "MSWDO",
+      "session-key",
+    );
+
+    expect(details).toBe("Prepared and distributed 12 meeting invitations to SK chairpersons.");
+    expect(mocks.generateContent.mock.calls[0]?.[0].contents).toContain("Never invent");
+    expect(mocks.generateContent.mock.calls[0]?.[0].contents).toContain("one description only");
+  });
+
   it("turns a valid structured provider response into editable activities", async () => {
     mocks.generateContent.mockResolvedValue({
       text: JSON.stringify({

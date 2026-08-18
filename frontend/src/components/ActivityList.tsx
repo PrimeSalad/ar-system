@@ -23,7 +23,7 @@ export function ActivityList({ activities, onEdit, onDelete, onAddFocus }: Activ
         <div className="empty-state">
           <div className="empty-state__icon"><ClipboardList aria-hidden="true" size={28} /></div>
           <h3>Your report is ready for its first entry</h3>
-          <p>Add an accomplishment manually or paste several rough notes into Gemini.</p>
+          <p>Add one entry, use Bulk same-day, or paste several rough notes into Gemini.</p>
           <button className="button button--outline" type="button" onClick={onAddFocus}>
             <Plus aria-hidden="true" size={17} />
             Add first entry

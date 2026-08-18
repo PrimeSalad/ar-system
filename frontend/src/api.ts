@@ -60,6 +60,21 @@ export async function testAiConnection(sessionApiKey?: string): Promise<{ ok: tr
   });
 }
 
+export async function improveActivityDescription(
+  notes: string,
+  office: string,
+  sessionApiKey?: string,
+): Promise<string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (sessionApiKey) headers["x-gemini-api-key"] = sessionApiKey;
+  const result = await apiFetch<{ details: string }>("/api/ai/description", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ notes, office }),
+  });
+  return result.details;
+}
+
 export async function generateAiDraft(
   report: Report,
   notes: string,
