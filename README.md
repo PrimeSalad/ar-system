@@ -1,7 +1,5 @@
 # AccomplishPro
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PrimeSalad/ar-system)
-
 AccomplishPro automates the Municipality of Boac MSWDO accomplishment report using the format in `2026 ACCOMPLISHMENT TRUE .xlsx`. It has a separate React/TypeScript frontend and Express/TypeScript backend, local draft storage, a live official-document preview, Gemini-assisted writing, browser printing/PDF, and exact-format Excel export.
 
 ## What is included
@@ -65,11 +63,13 @@ npm run check
 npm start
 ```
 
-`npm run check` runs TypeScript validation, automated tests, and both production builds. After building, `npm start` serves the API and the compiled frontend together at [http://localhost:4000](http://localhost:4000). The source applications remain separated in `frontend/` and `backend/`.
+`npm run check` runs TypeScript validation, automated tests, and both production builds. `npm start` runs the compiled API at [http://localhost:4000](http://localhost:4000); the production frontend is deployed separately.
 
-## Deploy on Render
+## Deployment
 
-The repository includes a `render.yaml` Blueprint for a single full-stack web service in Render's Singapore region. Click **Deploy to Render** above, connect this GitHub repository, and Render will install the build tooling, create both production bundles, prune development dependencies, run the health check, and start the server automatically.
+The Express API is deployed on Render from `render.yaml`. Render installs the build tooling, builds only the backend workspace, prunes development dependencies, checks `/api/health`, and starts the API server.
+
+The React frontend is deployed separately on Vercel from `vercel.json`. Set the Vercel build environment variable `VITE_API_URL` to the public Render service URL so browser requests reach the API.
 
 The app can use a browser-session Gemini key without a server secret. To configure Gemini for everyone, add `GEMINI_API_KEY` in the Render service environment. Free Render services use an ephemeral filesystem, so saved reports can reset after a restart or redeploy; attach a persistent disk or external datastore before relying on server-side storage for production records.
 

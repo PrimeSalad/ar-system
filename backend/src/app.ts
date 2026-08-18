@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -39,12 +37,20 @@ function defaultDataFile(): string {
 export function createApp(options: { dataFile?: string } = {}) {
   const app = express();
   const store = new JsonReportStore(options.dataFile ?? process.env.DATA_FILE ?? defaultDataFile());
-  const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
+  const configuredOrigins = (process.env.FRONTEND_ORIGIN ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const allowedOrigins = new Set(["http://localhost:5173", ...configuredOrigins]);
+  const vercelFrontendOrigin = /^https:\/\/accomplish-pro-boac(?:-[a-z0-9-]+)*\.vercel\.app$/i;
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(
     cors({
-      origin: allowedOrigin,
+      origin(origin, callback) {
+        const allowed = !origin || allowedOrigins.has(origin) || vercelFrontendOrigin.test(origin);
+        callback(null, allowed);
+      },
       methods: ["GET", "POST", "PUT", "DELETE"],
       allowedHeaders: ["Content-Type", "x-gemini-api-key"],
     }),
@@ -151,18 +157,6 @@ export function createApp(options: { dataFile?: string } = {}) {
       next(error);
     }
   });
-
-  const frontendDist = fileURLToPath(new URL("../../frontend/dist", import.meta.url));
-  if (existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
-    app.use((request, response, next) => {
-      if (request.method === "GET" && !request.path.startsWith("/api/") && request.accepts("html")) {
-        response.sendFile(path.join(frontendDist, "index.html"));
-        return;
-      }
-      next();
-    });
-  }
 
   app.use((_request, response) => {
     response.status(404).json({ error: "Endpoint not found" });

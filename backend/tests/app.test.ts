@@ -75,6 +75,28 @@ describe("Gemini API", () => {
   });
 });
 
+describe("frontend CORS", () => {
+  it("allows the Vercel frontend and rejects unrelated browser origins", async () => {
+    const app = createApp();
+
+    const allowed = await request(app)
+      .options("/api/health")
+      .set("Origin", "https://accomplish-pro-boac.vercel.app")
+      .set("Access-Control-Request-Method", "GET")
+      .expect(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe(
+      "https://accomplish-pro-boac.vercel.app",
+    );
+
+    const rejected = await request(app)
+      .options("/api/health")
+      .set("Origin", "https://unrelated.example")
+      .set("Access-Control-Request-Method", "GET")
+      .expect(404);
+    expect(rejected.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+});
+
 describe("report API", () => {
   it("persists and returns a valid report", async () => {
     const dataFile = path.join(os.tmpdir(), `accomplish-pro-${crypto.randomUUID()}.json`);

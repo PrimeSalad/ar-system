@@ -1,5 +1,11 @@
 import type { Activity, AiStatus, Report } from "./types";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
+
+function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
+
 interface ApiErrorBody {
   error?: string;
   issues?: Array<{ path: string; message: string }>;
@@ -17,7 +23,7 @@ async function readError(response: Response): Promise<Error> {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, options);
+  const response = await fetch(apiUrl(path), options);
   if (!response.ok) throw await readError(response);
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
@@ -79,7 +85,7 @@ export async function generateAiDraft(
 }
 
 export async function downloadExcel(report: Report): Promise<void> {
-  const response = await fetch("/api/exports/xlsx", {
+  const response = await fetch(apiUrl("/api/exports/xlsx"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(report),
