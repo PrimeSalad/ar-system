@@ -4,7 +4,7 @@ import path from "node:path";
 import ExcelJS from "exceljs";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { clampDraftDate, createApp } from "../src/app.js";
 import { buildAccomplishmentWorkbook } from "../src/excel.js";
 import type { ReportInput } from "../src/report-schema.js";
 
@@ -50,6 +50,11 @@ afterEach(async () => {
 });
 
 describe("Gemini API", () => {
+  it("clamps fallback dates into past reporting periods", () => {
+    expect(clampDraftDate("2026-08-18", "2025-01-01", "2025-01-15")).toBe("2025-01-15");
+    expect(clampDraftDate("2024-12-20", "2025-01-01", "2025-01-15")).toBe("2025-01-01");
+  });
+
   it("reports missing configuration without attempting a provider request", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
     const app = createApp();

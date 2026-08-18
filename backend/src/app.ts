@@ -21,14 +21,20 @@ const draftRequestSchema = z.object({
   defaultUnits: z.number().int().positive().max(1_000_000).default(1),
   office: z.string().trim().min(2).max(100),
 }).superRefine((request, context) => {
-  if (request.defaultDate && (request.defaultDate < request.startDate || request.defaultDate > request.endDate)) {
+  if (request.startDate > request.endDate) {
     context.addIssue({
       code: "custom",
-      path: ["defaultDate"],
-      message: "Default date must be inside the reporting period",
+      path: ["endDate"],
+      message: "Reporting period end must be on or after its start",
     });
   }
 });
+
+export function clampDraftDate(value: string | undefined, startDate: string, endDate: string): string {
+  if (!value || value < startDate) return startDate;
+  if (value > endDate) return endDate;
+  return value;
+}
 
 function defaultDataFile(): string {
   return fileURLToPath(new URL("../data/reports.json", import.meta.url));
@@ -91,7 +97,10 @@ export function createApp(options: { dataFile?: string } = {}) {
     try {
       const payload = draftRequestSchema.parse(request.body);
       const apiKey = request.header("x-gemini-api-key");
-      const activities = await draftActivities(payload, apiKey);
+      const activities = await draftActivities({
+        ...payload,
+        defaultDate: clampDraftDate(payload.defaultDate, payload.startDate, payload.endDate),
+      }, apiKey);
       response.json({ activities });
     } catch (error) {
       next(error);

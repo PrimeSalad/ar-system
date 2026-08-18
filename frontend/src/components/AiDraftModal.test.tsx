@@ -106,4 +106,36 @@ describe("AI draft modal", () => {
     expect(await screen.findByText("Enter a positive whole number up to 1,000,000.")).toBeTruthy();
     expect(generateAiDraft).not.toHaveBeenCalled();
   });
+
+  it("clamps a stale default date into a past reporting period", async () => {
+    sessionStorage.setItem(SESSION_KEY_NAME, "session-key");
+    vi.mocked(generateAiDraft).mockResolvedValue([]);
+    const pastReport = { ...report, startDate: "2025-01-01", endDate: "2025-01-15" };
+
+    render(
+      <AiDraftModal
+        open
+        report={pastReport}
+        serverConfigured={false}
+        onClose={vi.fn()}
+        onAdd={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+
+    expect((screen.getByLabelText("Date to use when your story has no date") as HTMLInputElement).value)
+      .toBe("2025-01-15");
+    fireEvent.change(screen.getByLabelText("What did you work on?"), {
+      target: { value: "Prepared the January accomplishment report" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create report entries" }));
+
+    await waitFor(() => expect(generateAiDraft).toHaveBeenCalledWith(
+      pastReport,
+      "Prepared the January accomplishment report",
+      "session-key",
+      "2025-01-15",
+      1,
+    ));
+  });
 });

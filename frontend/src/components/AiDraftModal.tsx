@@ -2,7 +2,7 @@ import { AlertCircle, LoaderCircle, Sparkles, WandSparkles } from "lucide-react"
 import { useEffect, useState } from "react";
 import { generateAiDraft } from "../api";
 import type { Activity, Report } from "../types";
-import { toIsoDate } from "../utils";
+import { clampDateToPeriod, toIsoDate } from "../utils";
 import { SESSION_KEY_NAME } from "./SettingsModal";
 import { Modal } from "./Modal";
 
@@ -16,8 +16,7 @@ interface AiDraftModalProps {
 }
 
 function suggestedDate(report: Report): string {
-  const today = toIsoDate(new Date());
-  return today >= report.startDate && today <= report.endDate ? today : report.startDate;
+  return clampDateToPeriod(toIsoDate(new Date()), report.startDate, report.endDate);
 }
 
 export function AiDraftModal({
@@ -51,6 +50,12 @@ export function AiDraftModal({
       setUnitsError("Enter a positive whole number up to 1,000,000.");
       return;
     }
+    if (report.startDate > report.endDate) {
+      setError("Set a valid reporting period before creating entries.");
+      return;
+    }
+    const safeDefaultDate = clampDateToPeriod(defaultDate, report.startDate, report.endDate);
+    setDefaultDate(safeDefaultDate);
     setLoading(true);
     setError("");
     try {
@@ -58,7 +63,7 @@ export function AiDraftModal({
         report,
         notes,
         sessionStorage.getItem(SESSION_KEY_NAME) ?? undefined,
-        defaultDate,
+        safeDefaultDate,
         parsedDefaultUnits,
       );
       onAdd(activities);
@@ -107,11 +112,13 @@ export function AiDraftModal({
             min={report.startDate}
             max={report.endDate}
             value={defaultDate}
-            onChange={(event) => setDefaultDate(event.target.value)}
+            onChange={(event) => setDefaultDate(
+              clampDateToPeriod(event.target.value, report.startDate, report.endDate),
+            )}
             disabled={loading}
             required
           />
-          <p className="field-help">Explicit dates mentioned in your story will still be used.</p>
+          <p className="field-help">Past periods are supported. This date always stays inside the selected period.</p>
         </div>
 
         <div className="field-group">

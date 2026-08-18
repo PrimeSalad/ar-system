@@ -1,6 +1,7 @@
 import { CalendarDays, Check, Plus, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { CATEGORY_OPTIONS, type Activity, type Report } from "../types";
+import { clampDateToPeriod, toIsoDate } from "../utils";
 
 interface ActivityEditorProps {
   report: Report;
@@ -19,7 +20,7 @@ interface DraftActivity {
 
 function freshDraft(report: Report): DraftActivity {
   return {
-    date: report.startDate,
+    date: clampDateToPeriod(toIsoDate(new Date()), report.startDate, report.endDate),
     category: CATEGORY_OPTIONS[0],
     details: "",
     units: "1",
@@ -44,7 +45,7 @@ export function ActivityEditor({ report, editing, onSubmit, onCancelEdit, onOpen
         date:
           current.date >= report.startDate && current.date <= report.endDate
             ? current.date
-            : report.startDate,
+            : clampDateToPeriod(current.date, report.startDate, report.endDate),
       }));
     }
     setErrors({});

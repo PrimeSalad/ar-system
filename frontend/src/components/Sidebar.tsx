@@ -61,10 +61,10 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar__actions">
-        <button className="button button--sidebar-primary" type="button" onClick={onNew}>
+        <button className="button button--sidebar-primary" type="button" onClick={onNew} aria-label="Create a new report" title="New report">
           <FilePlus2 aria-hidden="true" size={18} /> New report
         </button>
-        <button className="button button--sidebar-ghost" type="button" onClick={onSettings}>
+        <button className="button button--sidebar-ghost" type="button" onClick={onSettings} aria-label="Open Gemini settings" title="Gemini settings">
           <Settings aria-hidden="true" size={18} /> Gemini settings
         </button>
       </div>

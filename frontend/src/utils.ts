@@ -7,6 +7,13 @@ export function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function clampDateToPeriod(value: string, startDate: string, endDate: string): string {
+  if (!startDate || !endDate || startDate > endDate) return value || startDate || endDate;
+  if (!value || value < startDate) return startDate;
+  if (value > endDate) return endDate;
+  return value;
+}
+
 export function createBlankReport(now = new Date()): Report {
   const year = now.getFullYear();
   const month = now.getMonth();

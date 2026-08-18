@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { activityDescription, createBlankReport, formatPeriod } from "./utils";
+import { activityDescription, clampDateToPeriod, createBlankReport, formatPeriod } from "./utils";
 
 describe("report utilities", () => {
   it("creates a second-half report through the actual month end", () => {
@@ -14,6 +14,12 @@ describe("report utilities", () => {
 
   it("formats a same-month period cleanly", () => {
     expect(formatPeriod("2026-08-16", "2026-08-31")).toBe("August 16–31, 2026");
+  });
+
+  it("keeps default dates inside current, past, and future reporting periods", () => {
+    expect(clampDateToPeriod("2026-08-20", "2026-08-16", "2026-08-31")).toBe("2026-08-20");
+    expect(clampDateToPeriod("2026-09-10", "2026-07-01", "2026-07-31")).toBe("2026-07-31");
+    expect(clampDateToPeriod("2026-01-01", "2026-09-01", "2026-09-15")).toBe("2026-09-01");
   });
 
   it("combines the approved category and details", () => {
